@@ -48,6 +48,7 @@ static void PrintHelp() {
     console::Printf(console::kColorReset,   "  awake daemon on         %sStart the background daemon.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake daemon status     %sShow daemon status and watched applications.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake daemon off        %sStop the background daemon.\n", console::kColorReset);
+    console::Printf(console::kColorReset,   "  awake reload            %sRe-read the configuration file immediately.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake add <imagename>   %sAdd an image name to the watch list.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake del <imagename>   %sRemove an image name from the watch list.\n", console::kColorReset);
     console::PrintLine(console::kColorReset, "");
@@ -245,6 +246,22 @@ static int CmdDaemonOff() {
     return 0;
 }
 
+// "awake reload": ask the daemon to re-read the configuration file now.
+static int CmdReload() {
+    if (!ipc::IsDaemonRunning()) {
+        console::PrintLine(console::kColorYellow, "Daemon is not running.");
+        console::PrintLine(console::kColorReset,  "There is nothing to reload; the configuration is read when the daemon starts.");
+        return 0;
+    }
+    std::string response;
+    if (!ipc::SendRequest("RELOAD", response) || response.compare(0, 2, "OK") != 0) {
+        console::PrintLine(console::kColorRed, "Error: the daemon did not acknowledge the reload request.");
+        return 1;
+    }
+    console::PrintLine(console::kColorGreen, "Configuration reloaded.");
+    return 0;
+}
+
 // "awake add <imagename>" / "awake del <imagename>": edit the watch list.
 static int CmdEditWatchList(const char* command, const char* imageName) {
     const std::string name(imageName);
@@ -315,6 +332,9 @@ int main(int argc, char** argv) {
         if (sub == "off")   return CmdDaemonOff();
         console::Printf(console::kColorRed, "Error: unknown daemon subcommand '%s' (expected on, status or off).\n", argv[2]);
         return 1;
+    }
+    if (command == "reload") {
+        return CmdReload();
     }
     if (command == "add" || command == "del") {
         if (argc < 3) {

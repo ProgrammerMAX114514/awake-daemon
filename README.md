@@ -44,6 +44,7 @@ awake daemon on         Start the background daemon.
 awake daemon status     Show daemon status and the watched applications
                         (green = configured and running, red = configured but not running).
 awake daemon off        Stop the background daemon.
+awake reload            Re-read the configuration file immediately.
 awake add <imagename>   Add an image name to the watch list.
 awake del <imagename>   Remove an image name from the watch list.
 ```
@@ -63,7 +64,7 @@ Notes:
 notepad.exe
 ```
 
-While any listed image name is running, the daemon blocks idle sleep/hibernation. Use `awake add` / `awake del` to edit the list comfortably; changes take effect without restarting the daemon (picked up within 30 seconds).
+While any listed image name is running, the daemon blocks idle sleep/hibernation. Use `awake add` / `awake del` to edit the list comfortably; changes are picked up automatically within 30 seconds, or immediately with `awake reload`.
 
 ## How it works
 

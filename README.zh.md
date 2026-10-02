@@ -44,6 +44,7 @@ awake daemon on         启动后台守护进程。
 awake daemon status     显示守护进程状态和受监视的应用程序
                         （绿色 = 在配置中且正在运行，红色 = 在配置中但未运行）。
 awake daemon off        停止后台守护进程。
+awake reload            让守护进程立即重新读取配置文件。
 awake add <imagename>   向监视列表添加映像名。
 awake del <imagename>   从监视列表删除映像名。
 ```
@@ -63,7 +64,7 @@ awake del <imagename>   从监视列表删除映像名。
 notepad.exe
 ```
 
-当列表中的任何映像名正在运行时，守护进程会阻止空闲睡眠/休眠。推荐使用 `awake add` / `awake del` 编辑列表；修改无需重启守护进程（30 秒内生效）。
+当列表中的任何映像名正在运行时，守护进程会阻止空闲睡眠/休眠。推荐使用 `awake add` / `awake del` 编辑列表；修改会在 30 秒内自动生效，也可以用 `awake reload` 立即生效。
 
 ## 工作原理
 

@@ -192,6 +192,13 @@ std::string HandleRequest(const std::string& request) {
     if (verb == "GET_APPS") {
         return HandleGetApps();
     }
+    if (verb == "RELOAD") {
+        // Wake the power thread: its next pass re-reads the configuration
+        // file and re-applies the desired state immediately, instead of
+        // waiting up to 30 seconds for the regular poll.
+        SetEvent(g_wakeEvent);
+        return "OK configuration reload requested\n";
+    }
     if (verb == "SHUTDOWN") {
         EnterCriticalSection(&g_lock);
         g_exitRequested = true;
