@@ -18,23 +18,37 @@ const char* const kDaemonExeName     = "awake.daemon.exe";
 bool SendRequest(const std::string& request, std::string& response) {
     response.clear();
 
-    // Open a connection to the daemon's pipe. When all pipe instances are
-    // busy, wait briefly for a free one and retry once.
-    HANDLE pipe = CreateFileA(kPipeName,
-                              GENERIC_READ | GENERIC_WRITE,
-                              0,           // no sharing: exclusive client end
-                              NULL,
-                              OPEN_EXISTING,
-                              0,
-                              NULL);
-    if (pipe == INVALID_HANDLE_VALUE && GetLastError() == ERROR_PIPE_BUSY) {
-        WaitNamedPipeA(kPipeName, 2000);
+    // Open a connection to the daemon's pipe. Two transient situations must
+    // be retried:
+    //   - ERROR_PIPE_BUSY: the single pipe instance is currently serving
+    //     another client (wait for a free instance).
+    //   - ERROR_FILE_NOT_FOUND: the daemon is between two request cycles,
+    //     i.e. it just closed the served instance and has not re-created
+    //     the pipe yet. A client firing back-to-back requests (PING followed
+    //     by the real command) can hit that gap, so retry briefly.
+    HANDLE pipe = INVALID_HANDLE_VALUE;
+    const ULONGLONG deadline = GetTickCount64() + 2000; // 2 s connection budget
+    for (;;) {
         pipe = CreateFileA(kPipeName,
                            GENERIC_READ | GENERIC_WRITE,
-                           0, NULL, OPEN_EXISTING, 0, NULL);
-    }
-    if (pipe == INVALID_HANDLE_VALUE) {
-        return false; // the daemon is not reachable
+                           0,           // no sharing: exclusive client end
+                           NULL,
+                           OPEN_EXISTING,
+                           0,
+                           NULL);
+        if (pipe != INVALID_HANDLE_VALUE) {
+            break;
+        }
+        const DWORD error = GetLastError();
+        const bool transient = (error == ERROR_PIPE_BUSY || error == ERROR_FILE_NOT_FOUND);
+        if (!transient || GetTickCount64() >= deadline) {
+            return false; // the daemon is not reachable
+        }
+        if (error == ERROR_PIPE_BUSY) {
+            WaitNamedPipeA(kPipeName, 500);
+        } else {
+            Sleep(25);
+        }
     }
 
     // Write the request line. The protocol only carries short ASCII text,
