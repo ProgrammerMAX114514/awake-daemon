@@ -149,24 +149,27 @@ std::string HandleGetApps() {
 // Parses one request line and produces the response. May set the shutdown
 // flag for the SHUTDOWN command.
 std::string HandleRequest(const std::string& request) {
+    // Strip the trailing newline/whitespace that the request line carries,
+    // so that argument-less verbs ("PING\n") compare equal to their name.
+    std::string line = request;
+    while (!line.empty() && (line[line.size() - 1] == '\n' ||
+                             line[line.size() - 1] == '\r' ||
+                             line[line.size() - 1] == ' ')) {
+        line.erase(line.size() - 1);
+    }
+
     // Split off the first word and the rest of the line.
-    const size_t firstSpace = request.find(' ');
-    const std::string verb = request.substr(0, firstSpace == std::string::npos ? request.size() : firstSpace);
+    const size_t firstSpace = line.find(' ');
+    const std::string verb = line.substr(0, firstSpace == std::string::npos ? line.size() : firstSpace);
 
     if (verb == "PING") {
         return "OK PONG\n";
     }
     if (verb == "KEEP_AWAKE") {
-        // Extract the argument and strip the trailing newline/whitespace
-        // that the request line carries.
-        std::string arg = (firstSpace == std::string::npos)
-                              ? ""
-                              : request.substr(firstSpace + 1);
-        while (!arg.empty() && (arg[arg.size() - 1] == '\n' ||
-                                arg[arg.size() - 1] == '\r' ||
-                                arg[arg.size() - 1] == ' ')) {
-            arg.erase(arg.size() - 1);
-        }
+        // The line is already trimmed, so the argument is clean.
+        const std::string arg = (firstSpace == std::string::npos)
+                                    ? ""
+                                    : line.substr(firstSpace + 1);
         if (arg == "1") {
             EnterCriticalSection(&g_lock);
             g_manualKeepAwake = true;
