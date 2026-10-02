@@ -86,6 +86,14 @@ void ApplyDesiredState() {
 // Before exiting it resets the execution state one last time so the
 // daemon never leaves a stray "keep awake" requirement behind.
 DWORD WINAPI PowerThreadProc(LPVOID /*param*/) {
+    // One-shot notification right after the daemon starts: regardless of
+    // the current keep-awake setting, tell the system once to stay awake.
+    // ES_SYSTEM_REQUIRED without ES_CONTINUOUS affects only the next idle
+    // evaluation (it resets the idle timer once) and does NOT latch a
+    // persistent keep-awake requirement - the loop below keeps applying
+    // the state that matches the current settings.
+    SetThreadExecutionState(ES_SYSTEM_REQUIRED);
+
     for (;;) {
         ApplyDesiredState();
 
