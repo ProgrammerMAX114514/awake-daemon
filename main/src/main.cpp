@@ -1,0 +1,330 @@
+// =============================================================================
+// main.cpp - awake.exe, the client command line tool.
+//
+// Parses the command line, talks to the daemon over the named pipe and
+// prints the results with ANSI colors. Commands:
+//
+//   awake help              print help
+//   awake 0                 disable keep-awake
+//   awake 1                 enable keep-awake
+//   awake status            show keep-awake status (never starts the daemon)
+//   awake daemon on         start the daemon
+//   awake daemon status     show daemon status + watched applications
+//   awake daemon off        stop the daemon
+//   awake add <imagename>   add an image name to the watch list
+//   awake del <imagename>   remove an image name from the watch list
+//
+// "awake 0" and "awake 1" start the daemon automatically when it is not
+// running. "awake status" and "awake daemon status" deliberately never do,
+// because their purpose is to report the current state.
+// =============================================================================
+
+#include <windows.h>
+
+#include <cstdio>
+#include <set>
+#include <string>
+#include <vector>
+
+#include "config.h"
+#include "console.h"
+#include "ipc.h"
+#include "process.h"
+
+// -----------------------------------------------------------------------------
+// Help text
+// -----------------------------------------------------------------------------
+
+// Prints the colored usage help. This is shown for "awake help", for
+// "awake" without arguments and as a hint after unknown commands.
+static void PrintHelp() {
+    console::Printf(console::kColorCyan, "awake - keep the system awake\n");
+    console::PrintLine(console::kColorReset, "");
+    console::PrintLine(console::kColorReset, "Usage:");
+    console::Printf(console::kColorReset,   "  awake help              %sShow this help message.\n", console::kColorReset);
+    console::Printf(console::kColorReset,   "  awake 0                 %sDisable keep-awake (restore default power behavior).\n", console::kColorReset);
+    console::Printf(console::kColorReset,   "  awake 1                 %sEnable keep-awake (block idle sleep and hibernation).\n", console::kColorReset);
+    console::Printf(console::kColorReset,   "  awake status            %sShow the current keep-awake status.\n", console::kColorReset);
+    console::Printf(console::kColorReset,   "  awake daemon on         %sStart the background daemon.\n", console::kColorReset);
+    console::Printf(console::kColorReset,   "  awake daemon status     %sShow daemon status and watched applications.\n", console::kColorReset);
+    console::Printf(console::kColorReset,   "  awake daemon off        %sStop the background daemon.\n", console::kColorReset);
+    console::Printf(console::kColorReset,   "  awake add <imagename>   %sAdd an image name to the watch list.\n", console::kColorReset);
+    console::Printf(console::kColorReset,   "  awake del <imagename>   %sRemove an image name from the watch list.\n", console::kColorReset);
+    console::PrintLine(console::kColorReset, "");
+    console::PrintLine(console::kColorReset, "Notes:");
+    console::PrintLine(console::kColorReset, "  - Keep-awake only blocks idle sleep/hibernation. Manual sleep via the");
+    console::PrintLine(console::kColorReset, "    power button, the Start menu or other applications still works.");
+    console::PrintLine(console::kColorReset, "  - While a watched application (see awake.ini) is running, the daemon");
+    console::PrintLine(console::kColorReset, "    blocks idle sleep/hibernation as well.");
+    console::PrintLine(console::kColorReset, "  - 'awake 0' and 'awake 1' start the daemon automatically when needed;");
+    console::PrintLine(console::kColorReset, "    'awake status' never does.");
+}
+
+// -----------------------------------------------------------------------------
+// Daemon management helpers
+// -----------------------------------------------------------------------------
+
+// Makes sure the daemon is running, starting it if necessary. Only used by
+// the commands that must talk to the daemon (0, 1).
+static bool EnsureDaemonRunning() {
+    if (ipc::IsDaemonRunning()) {
+        return true;
+    }
+    console::PrintLine(console::kColorYellow, "Daemon is not running. Starting daemon...");
+    if (!ipc::StartDaemon()) {
+        console::Printf(console::kColorRed, "Error: failed to start '%s'.\n", ipc::kDaemonExeName);
+        return false;
+    }
+    if (!ipc::WaitForDaemon(5000)) {
+        console::PrintLine(console::kColorRed, "Error: the daemon was started but does not respond.");
+        return false;
+    }
+    return true;
+}
+
+// -----------------------------------------------------------------------------
+// Command implementations
+// -----------------------------------------------------------------------------
+
+// "awake 0" / "awake 1": forward the request to the daemon.
+static int CmdSetKeepAwake(bool enable) {
+    if (!EnsureDaemonRunning()) {
+        return 1;
+    }
+    std::string response;
+    if (!ipc::SendRequest(enable ? "KEEP_AWAKE 1" : "KEEP_AWAKE 0", response)) {
+        console::PrintLine(console::kColorRed, "Error: lost contact with the daemon.");
+        return 1;
+    }
+    if (response.compare(0, 2, "OK") == 0) {
+        if (enable) {
+            console::PrintLine(console::kColorGreen, "Keep-awake ENABLED. Idle sleep/hibernation is now blocked.");
+        } else {
+            console::PrintLine(console::kColorGreen, "Keep-awake DISABLED. The system uses its default power behavior.");
+        }
+        return 0;
+    }
+    console::Printf(console::kColorRed, "Error: the daemon rejected the request: %s", response.c_str());
+    return 1;
+}
+
+// "awake status": report the state without ever starting the daemon.
+static int CmdStatus() {
+    if (!ipc::IsDaemonRunning()) {
+        console::PrintLine(console::kColorYellow, "Daemon is not running.");
+        console::PrintLine(console::kColorReset,  "Keep-awake is INACTIVE (the system uses its default power behavior).");
+        return 0;
+    }
+
+    std::string response;
+    if (!ipc::SendRequest("GET_STATUS", response)) {
+        console::PrintLine(console::kColorRed, "Error: lost contact with the daemon.");
+        return 1;
+    }
+
+    // The response is a small set of "KEY=VALUE" lines:
+    //   OK / MANUAL=<0|1> / APP=<0|1> / ACTIVE=<0|1>
+    bool manual = false;
+    bool app = false;
+    bool active = false;
+    size_t lineStart = 0;
+    while (lineStart <= response.size()) {
+        size_t lineEnd = response.find('\n', lineStart);
+        if (lineEnd == std::string::npos) {
+            lineEnd = response.size();
+        }
+        const std::string line = response.substr(lineStart, lineEnd - lineStart);
+        if (line.compare(0, 7, "MANUAL=") == 0) {
+            manual = (line.compare(7, 1, "1") == 0);
+        } else if (line.compare(0, 4, "APP=") == 0) {
+            app = (line.compare(4, 1, "1") == 0);
+        } else if (line.compare(0, 7, "ACTIVE=") == 0) {
+            active = (line.compare(7, 1, "1") == 0);
+        }
+        if (lineEnd == response.size()) {
+            break;
+        }
+        lineStart = lineEnd + 1;
+    }
+
+    if (!active) {
+        console::Printf(console::kColorReset, "Keep-awake is %sINACTIVE%s (the system uses its default power behavior).\n",
+                        console::kColorYellow, console::kColorReset);
+    } else {
+        console::Printf(console::kColorGreen, "Keep-awake is ENABLED");
+        // Explain why the daemon is currently blocking sleep.
+        if (manual && app) {
+            console::Printf(console::kColorReset, " (manually set and a watched application is running)");
+        } else if (manual) {
+            console::Printf(console::kColorReset, " (manually set)");
+        } else {
+            console::Printf(console::kColorReset, " (a watched application is running)");
+        }
+        console::Printf(console::kColorReset, ".\n");
+    }
+    return 0;
+}
+
+// "awake daemon on": launch the daemon unless it is already running.
+static int CmdDaemonOn() {
+    if (ipc::IsDaemonRunning()) {
+        console::PrintLine(console::kColorYellow, "The daemon is already running.");
+        return 0;
+    }
+    if (!config::EnsureConfigExists()) {
+        console::PrintLine(console::kColorRed, "Error: cannot create the configuration file (awake.ini).");
+        return 1;
+    }
+    if (!ipc::StartDaemon()) {
+        console::Printf(console::kColorRed, "Error: failed to start '%s'.\n", ipc::kDaemonExeName);
+        return 1;
+    }
+    if (!ipc::WaitForDaemon(5000)) {
+        console::PrintLine(console::kColorRed, "Error: the daemon was started but does not respond.");
+        return 1;
+    }
+    console::PrintLine(console::kColorGreen, "The daemon is now running.");
+    return 0;
+}
+
+// "awake daemon status": running state, keep-awake state and the watch list
+// with green entries for running applications and red entries for the rest.
+static int CmdDaemonStatus() {
+    const bool running = ipc::IsDaemonRunning();
+    console::Printf(console::kColorReset, "Daemon:     ");
+    if (running) {
+        console::PrintLine(console::kColorGreen, "running");
+    } else {
+        console::PrintLine(console::kColorRed, "not running");
+    }
+
+    // When the daemon runs, it knows the authoritative keep-awake state.
+    if (running) {
+        std::string response;
+        if (ipc::SendRequest("GET_STATUS", response) &&
+            response.find("ACTIVE=1") != std::string::npos) {
+            console::Printf(console::kColorGreen, "Keep-awake: enabled%s\n", console::kColorReset);
+        } else {
+            console::Printf(console::kColorReset, "Keep-awake: disabled\n");
+        }
+    }
+
+    // The watch list always comes from the configuration file, so it is
+    // shown even when the daemon is not running. The running check is done
+    // locally in that case.
+    const std::vector<std::string> watchList = config::ReadWatchList();
+    console::Printf(console::kColorReset, "Watch list (%s):\n", config::GetConfigPath().c_str());
+    if (watchList.empty()) {
+        console::PrintLine(console::kColorYellow, "  (empty - use 'awake add <imagename>' to add entries)");
+        return 0;
+    }
+
+    const std::set<std::string> runningNames = process::FindRunningImages(watchList);
+    for (size_t i = 0; i < watchList.size(); ++i) {
+        if (runningNames.count(config::ToLowerAscii(watchList[i])) > 0) {
+            console::Printf(console::kColorGreen, "  %s (running)\n", watchList[i].c_str());
+        } else {
+            console::Printf(console::kColorRed, "  %s (not running)\n", watchList[i].c_str());
+        }
+    }
+    return 0;
+}
+
+// "awake daemon off": politely ask the daemon to shut down.
+static int CmdDaemonOff() {
+    if (!ipc::IsDaemonRunning()) {
+        console::PrintLine(console::kColorYellow, "The daemon is not running.");
+        return 0;
+    }
+    std::string response;
+    if (!ipc::SendRequest("SHUTDOWN", response) || response.compare(0, 2, "OK") != 0) {
+        console::PrintLine(console::kColorRed, "Error: the daemon did not acknowledge the shutdown request.");
+        return 1;
+    }
+    console::PrintLine(console::kColorGreen, "The daemon has been stopped.");
+    return 0;
+}
+
+// "awake add <imagename>" / "awake del <imagename>": edit the watch list.
+static int CmdEditWatchList(const char* command, const char* imageName) {
+    const std::string name(imageName);
+    if (!config::IsValidImageName(name)) {
+        console::Printf(console::kColorRed,
+                        "Error: '%s' is not a valid image name (plain file name without path or wildcards).\n",
+                        imageName);
+        return 1;
+    }
+    if (!config::EnsureConfigExists()) {
+        console::PrintLine(console::kColorRed, "Error: cannot create the configuration file (awake.ini).");
+        return 1;
+    }
+
+    if (std::string(command) == "add") {
+        if (config::AddWatchEntry(name)) {
+            console::Printf(console::kColorGreen, "Added '%s' to the watch list.\n", imageName);
+            return 0;
+        }
+        console::Printf(console::kColorYellow, "'%s' is already in the watch list.\n", imageName);
+        return 0;
+    }
+
+    if (config::RemoveWatchEntry(name)) {
+        console::Printf(console::kColorGreen, "Removed '%s' from the watch list.\n", imageName);
+        return 0;
+    }
+    console::Printf(console::kColorYellow, "'%s' was not found in the watch list.\n", imageName);
+    return 0;
+}
+
+// -----------------------------------------------------------------------------
+// Entry point
+// -----------------------------------------------------------------------------
+
+int main(int argc, char** argv) {
+    console::EnableColors();
+
+    // No arguments behaves like "help".
+    if (argc < 2) {
+        PrintHelp();
+        return 0;
+    }
+
+    const std::string command = argv[1];
+
+    if (command == "help" || command == "/?" || command == "-h" || command == "--help") {
+        PrintHelp();
+        return 0;
+    }
+    if (command == "0") {
+        return CmdSetKeepAwake(false);
+    }
+    if (command == "1") {
+        return CmdSetKeepAwake(true);
+    }
+    if (command == "status") {
+        return CmdStatus();
+    }
+    if (command == "daemon") {
+        if (argc < 3) {
+            console::PrintLine(console::kColorRed, "Error: missing daemon subcommand (on, status or off).");
+            return 1;
+        }
+        const std::string sub = argv[2];
+        if (sub == "on")    return CmdDaemonOn();
+        if (sub == "status") return CmdDaemonStatus();
+        if (sub == "off")   return CmdDaemonOff();
+        console::Printf(console::kColorRed, "Error: unknown daemon subcommand '%s' (expected on, status or off).\n", argv[2]);
+        return 1;
+    }
+    if (command == "add" || command == "del") {
+        if (argc < 3) {
+            console::Printf(console::kColorRed, "Error: missing image name. Usage: awake %s <imagename>\n", argv[1]);
+            return 1;
+        }
+        return CmdEditWatchList(argv[1], argv[2]);
+    }
+
+    console::Printf(console::kColorRed, "Error: unknown command '%s'.\n", argv[1]);
+    console::PrintLine(console::kColorReset, "Run 'awake help' to see the available commands.");
+    return 1;
+}
