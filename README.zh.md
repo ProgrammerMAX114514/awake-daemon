@@ -71,6 +71,20 @@ notepad.exe
 
 当列表中的任何映像名正在运行时，守护进程会阻止空闲睡眠/休眠。推荐使用 `awake add` / `awake del` 编辑列表；修改会在 30 秒内自动生效，也可以用 `awake reload` 立即生效。如需清空所有条目并恢复初始模板，可运行 `awake reset`——执行前会警告并要求二次确认，覆盖文件后运行中的守护进程会立即重新加载配置。
 
+## 项目结构
+
+```
+awake/
+├── build.bat          一键构建脚本（MSVC x64 + CMake）
+├── CMakeLists.txt     构建定义（目标：awake、awake.daemon）
+├── common/            客户端与守护进程共用代码
+│   ├── include/       console（彩色输出）、config（awake.ini）、
+│   │                  ipc（命名管道）、process（进程枚举）
+│   └── src/
+├── main/              客户端工具：awake.exe
+└── daemon/            后台守护进程：awake.daemon.exe
+```
+
 ## 工作原理
 
 - 守护进程通过 `SetThreadExecutionState` 持有 Windows 执行状态 `ES_CONTINUOUS | ES_SYSTEM_REQUIRED`，该状态只阻止空闲睡眠/休眠，不拦截手动睡眠请求。

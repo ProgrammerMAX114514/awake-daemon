@@ -1,0 +1,19 @@
+# Normalize line endings across platforms.
+* text=auto
+
+# Sources and text files use LF in the working tree as well.
+*.cpp text eol=lf
+*.h text eol=lf
+*.md text eol=lf
+CMakeLists.txt text eol=lf
+LICENSE text eol=lf
+NOTICE text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Batch scripts must keep CRLF for the Windows command interpreter.
+*.bat text eol=crlf
+
+# Never touch binary files (none expected in this repository).
+*.png binary
+*.ico binary

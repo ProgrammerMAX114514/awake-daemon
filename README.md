@@ -71,6 +71,20 @@ notepad.exe
 
 While any listed image name is running, the daemon blocks idle sleep/hibernation. Use `awake add` / `awake del` to edit the list comfortably; changes are picked up automatically within 30 seconds, or immediately with `awake reload`. To discard all entries and restore the initial template, run `awake reset` - it warns you and asks for a second confirmation before overwriting the file, and a running daemon reloads the configuration right away.
 
+## Project structure
+
+```
+awake/
+├── build.bat          One-shot build script (MSVC x64 + CMake)
+├── CMakeLists.txt     Build definition (targets: awake, awake.daemon)
+├── common/            Code shared by client and daemon
+│   ├── include/       console (colors), config (awake.ini),
+│   │                  ipc (named pipe), process (process scan)
+│   └── src/
+├── main/              Client tool: awake.exe
+└── daemon/            Background daemon: awake.daemon.exe
+```
+
 ## How it works
 
 - The daemon holds the Windows execution state `ES_CONTINUOUS | ES_SYSTEM_REQUIRED` via `SetThreadExecutionState`, which blocks idle sleep/hibernation without intercepting manual sleep requests.
