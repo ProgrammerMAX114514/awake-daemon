@@ -7,8 +7,8 @@
 //   2. Every 30 seconds, scan the running processes and keep the execution
 //      state while any image name from awake.ini is running.
 //   3. Serve client requests (awake.exe) on the named pipe
-//      "\\.\pipe\awake_daemon": PING, KEEP_AWAKE, GET_STATUS, GET_APPS and
-//      SHUTDOWN.
+//      "\\.\pipe\awake_daemon": PING, KEEP_AWAKE, SCREEN, GET_STATUS,
+//      GET_APPS, RELOAD and SHUTDOWN.
 //
 // The daemon must not be started by hand: it refuses to run unless it was
 // launched by the client with the hidden option "--internal-daemon <token>".
@@ -48,6 +48,7 @@ CRITICAL_SECTION g_lock;          // guards everything below
 HANDLE g_wakeEvent = NULL;        // wakes the power thread on demand
 bool   g_manualKeepAwake = false; // set by "awake 1", cleared by "awake 0"
 bool   g_appKeepAwake = false;    // true while a watched application runs
+bool   g_screenKeepAwake = false; // set by "awake screen on", cleared by "awake screen off"
 bool   g_exitRequested = false;   // set by the SHUTDOWN command
 
 // Applies the currently desired execution state. MUST be called on the
@@ -63,14 +64,25 @@ void ApplyDesiredState() {
     const std::set<std::string> running = process::FindRunningImages(watchList);
 
     bool manual;
+    bool screen;
     EnterCriticalSection(&g_lock);
     manual = g_manualKeepAwake;
+    screen = g_screenKeepAwake;
     LeaveCriticalSection(&g_lock);
 
     const bool appActive = !running.empty();
 
-    if (manual || appActive) {
-        SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
+    // The system must stay in the working state when keep-awake is active,
+    // a watched application runs, or the screen is held on (a sleeping
+    // system would turn the display off).
+    // ES_DISPLAY_REQUIRED additionally resets the display idle timer, which
+    // keeps the screen on and prevents the screensaver and the idle lock.
+    if (manual || appActive || screen) {
+        DWORD flags = ES_CONTINUOUS | ES_SYSTEM_REQUIRED;
+        if (screen) {
+            flags |= ES_DISPLAY_REQUIRED;
+        }
+        SetThreadExecutionState(flags);
     } else {
         SetThreadExecutionState(ES_CONTINUOUS);
     }
@@ -121,12 +133,14 @@ std::string HandleGetStatus() {
     EnterCriticalSection(&g_lock);
     const bool manual = g_manualKeepAwake;
     const bool app = g_appKeepAwake;
+    const bool screen = g_screenKeepAwake;
     LeaveCriticalSection(&g_lock);
 
     std::string response = "OK\n";
     response += "MANUAL=" + std::string(manual ? "1" : "0") + "\n";
     response += "APP=" + std::string(app ? "1" : "0") + "\n";
-    response += "ACTIVE=" + std::string((manual || app) ? "1" : "0") + "\n";
+    response += "SCREEN=" + std::string(screen ? "1" : "0") + "\n";
+    response += "ACTIVE=" + std::string((manual || app || screen) ? "1" : "0") + "\n";
     return response;
 }
 
@@ -185,6 +199,28 @@ std::string HandleRequest(const std::string& request) {
             return "OK keep-awake disabled\n";
         }
         return "ERR KEEP_AWAKE expects 0 or 1\n";
+    }
+    if (verb == "SCREEN") {
+        // Same argument handling as KEEP_AWAKE: the line is already
+        // trimmed, so the argument is a clean "0" or "1".
+        const std::string arg = (firstSpace == std::string::npos)
+                                    ? ""
+                                    : line.substr(firstSpace + 1);
+        if (arg == "1") {
+            EnterCriticalSection(&g_lock);
+            g_screenKeepAwake = true;
+            LeaveCriticalSection(&g_lock);
+            SetEvent(g_wakeEvent); // apply immediately instead of waiting for the next poll
+            return "OK screen keep-awake enabled\n";
+        }
+        if (arg == "0") {
+            EnterCriticalSection(&g_lock);
+            g_screenKeepAwake = false;
+            LeaveCriticalSection(&g_lock);
+            SetEvent(g_wakeEvent);
+            return "OK screen keep-awake disabled\n";
+        }
+        return "ERR SCREEN expects 0 or 1\n";
     }
     if (verb == "GET_STATUS") {
         return HandleGetStatus();
