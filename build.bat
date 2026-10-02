@@ -1,4 +1,21 @@
 @echo off
+rem Copyright 2026 ProgrammerMAX114514
+rem
+rem Licensed under the Apache License, Version 2.0 (the "License");
+rem you may not use this file except in compliance with the License.
+rem You may obtain a copy of the License at
+rem
+rem     http://www.apache.org/licenses/LICENSE-2.0
+rem
+rem Unless required by applicable law or agreed to in writing, software
+rem distributed under the License is distributed on an "AS IS" BASIS,
+rem WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+rem See the License for the specific language governing permissions and
+rem limitations under the License.
+rem
+rem AI-GENERATED SOFTWARE: this file was generated with AI assistance.
+rem Please review it carefully before use. The author is not liable for
+rem any consequences arising from the use of this software.
 rem =============================================================================
 rem awake - one-shot build script
 rem
