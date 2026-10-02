@@ -22,6 +22,7 @@
 #include <windows.h>
 
 #include <cstdio>
+#include <iostream>
 #include <set>
 #include <string>
 #include <vector>
@@ -49,6 +50,7 @@ static void PrintHelp() {
     console::Printf(console::kColorReset,   "  awake daemon status     %sShow daemon status and watched applications.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake daemon off        %sStop the background daemon.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake reload            %sRe-read the configuration file immediately.\n", console::kColorReset);
+    console::Printf(console::kColorReset,   "  awake reset             %sReset the configuration file (asks for confirmation).\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake add <imagename>   %sAdd an image name to the watch list.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake del <imagename>   %sRemove an image name from the watch list.\n", console::kColorReset);
     console::PrintLine(console::kColorReset, "");
@@ -262,6 +264,66 @@ static int CmdReload() {
     return 0;
 }
 
+// Removes leading and trailing blanks from a line of user input.
+static std::string TrimInput(const std::string& text) {
+    size_t begin = 0;
+    size_t end = text.size();
+    while (begin < end && (text[begin] == ' ' || text[begin] == '\t' ||
+                           text[begin] == '\r' || text[begin] == '\n')) {
+        ++begin;
+    }
+    while (end > begin && (text[end - 1] == ' ' || text[end - 1] == '\t' ||
+                           text[end - 1] == '\r' || text[end - 1] == '\n')) {
+        --end;
+    }
+    return text.substr(begin, end - begin);
+}
+
+// "awake reset": restore the configuration file to its initial state. The
+// user must confirm the destructive operation with an explicit "y"/"yes";
+// anything else (including an empty answer, EOF or Ctrl+C style aborts)
+// leaves the file untouched.
+static int CmdReset() {
+    if (!config::EnsureConfigExists()) {
+        console::PrintLine(console::kColorRed, "Error: cannot create the configuration file (awake.ini).");
+        return 1;
+    }
+
+    // Warning with the exact file path that is about to be wiped.
+    console::Printf(console::kColorRed,
+                    "WARNING: the configuration file\n  %s\nwill be RESET to its initial state.\n",
+                    config::GetConfigPath().c_str());
+    console::PrintLine(console::kColorRed,
+                       "All existing watch list entries and any manual edits will be PERMANENTLY LOST.");
+    console::Printf(console::kColorYellow, "Are you sure you want to continue? [y/N]: ");
+
+    std::string answer;
+    if (!std::getline(std::cin, answer)) {
+        answer.clear(); // stdin closed: treat as "no"
+    }
+    const std::string normalized = config::ToLowerAscii(TrimInput(answer));
+    if (normalized != "y" && normalized != "yes") {
+        console::PrintLine(console::kColorYellow, "Aborted. The configuration file was not changed.");
+        return 0;
+    }
+
+    if (!config::ResetConfig()) {
+        console::PrintLine(console::kColorRed, "Error: cannot write the configuration file (awake.ini).");
+        return 1;
+    }
+    console::PrintLine(console::kColorGreen, "The configuration file has been reset to its initial state.");
+
+    // Let a running daemon pick up the change immediately instead of
+    // waiting for the next 30 second poll.
+    if (ipc::IsDaemonRunning()) {
+        std::string response;
+        if (ipc::SendRequest("RELOAD", response) && response.compare(0, 2, "OK") == 0) {
+            console::PrintLine(console::kColorReset, "The running daemon has reloaded the configuration.");
+        }
+    }
+    return 0;
+}
+
 // "awake add <imagename>" / "awake del <imagename>": edit the watch list.
 static int CmdEditWatchList(const char* command, const char* imageName) {
     const std::string name(imageName);
@@ -335,6 +397,9 @@ int main(int argc, char** argv) {
     }
     if (command == "reload") {
         return CmdReload();
+    }
+    if (command == "reset") {
+        return CmdReset();
     }
     if (command == "add" || command == "del") {
         if (argc < 3) {

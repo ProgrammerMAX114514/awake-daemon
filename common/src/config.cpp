@@ -68,6 +68,17 @@ bool IsEntryLine(const std::string& line) {
     return true;
 }
 
+// Writes the initial template content to the given path, truncating any
+// existing file. Shared by EnsureConfigExists() and ResetConfig().
+bool WriteInitialConfig(const std::string& path) {
+    std::ofstream file(path.c_str(), std::ios::binary | std::ios::trunc);
+    if (!file.is_open()) {
+        return false;
+    }
+    file << kDefaultConfig;
+    return file.good();
+}
+
 // Writes all lines back to the configuration file, always terminating the
 // last line with a newline so that later appends stay well-formed.
 bool WriteAllLines(const std::string& path, const std::vector<std::string>& lines) {
@@ -104,12 +115,11 @@ bool EnsureConfigExists() {
     if (attributes != INVALID_FILE_ATTRIBUTES) {
         return true; // the file already exists
     }
-    std::ofstream file(path.c_str(), std::ios::binary);
-    if (!file.is_open()) {
-        return false;
-    }
-    file << kDefaultConfig;
-    return file.good();
+    return WriteInitialConfig(path);
+}
+
+bool ResetConfig() {
+    return WriteInitialConfig(GetConfigPath());
 }
 
 std::vector<std::string> ReadWatchList() {

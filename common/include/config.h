@@ -35,6 +35,11 @@ std::string GetExeDirectory();
 // Returns true when the file exists afterwards.
 bool EnsureConfigExists();
 
+// Overwrites the configuration file with the initial template content,
+// discarding every existing watch list entry. Manual edits and comments
+// are not preserved. Returns false when the file cannot be written.
+bool ResetConfig();
+
 // Reads the watch list (the image names currently configured).
 // Comment lines, empty lines and section headers are skipped.
 std::vector<std::string> ReadWatchList();
