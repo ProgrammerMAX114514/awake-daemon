@@ -2,6 +2,8 @@
 
 [English](README.md) | [简体中文](README.zh.md)
 
+Current version: **0.1.0-beta**
+
 `awake` is a Windows command line tool that keeps the system awake. It ships as two executables:
 
 - **awake.exe** - the client command line tool.

@@ -2,6 +2,8 @@
 
 [English](README.md) | [简体中文](README.zh.md)
 
+当前版本：**0.1.0-beta**
+
 `awake` 是一个 Windows 命令行工具，用于让系统保持唤醒。它由两个可执行文件组成：
 
 - **awake.exe** - 客户端命令行工具。

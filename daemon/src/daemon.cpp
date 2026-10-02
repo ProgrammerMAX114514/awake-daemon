@@ -53,6 +53,7 @@
 #include "console.h"
 #include "ipc.h"
 #include "process.h"
+#include "version.h"
 
 // -----------------------------------------------------------------------------
 // Shared daemon state (guarded by g_lock)
@@ -337,7 +338,8 @@ int main(int argc, char** argv) {
         }
     }
     if (!launchedInternally) {
-        console::PrintLine(console::kColorRed, "Error: awake.daemon.exe cannot be started directly.");
+        console::Printf(console::kColorRed, "Error: awake.daemon.exe (version %s) cannot be started directly.\n",
+                        version::kVersion);
         console::PrintLine(console::kColorReset, "Use 'awake daemon on' to start the daemon.");
         return 1;
     }

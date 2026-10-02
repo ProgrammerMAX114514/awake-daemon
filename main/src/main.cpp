@@ -22,6 +22,7 @@
 // Parses the command line, talks to the daemon over the named pipe and
 // prints the results with ANSI colors. Commands:
 //
+//   awake version           print the version
 //   awake help              print help
 //   awake 0                 disable keep-awake
 //   awake 1                 enable keep-awake
@@ -53,6 +54,7 @@
 #include "config.h"
 #include "console.h"
 #include "ipc.h"
+#include "version.h"
 #include "process.h"
 
 // -----------------------------------------------------------------------------
@@ -62,7 +64,7 @@
 // Prints the colored usage help. This is shown for "awake help", for
 // "awake" without arguments and as a hint after unknown commands.
 static void PrintHelp() {
-    console::Printf(console::kColorCyan, "awake - keep the system awake\n");
+    console::Printf(console::kColorCyan, "awake %s - keep the system awake\n", version::kVersion);
     console::PrintLine(console::kColorReset, "");
     console::PrintLine(console::kColorReset, "Usage:");
     console::Printf(console::kColorReset,   "  awake help              %sShow this help message.\n", console::kColorReset);
@@ -486,6 +488,10 @@ int main(int argc, char** argv) {
 
     const std::string command = argv[1];
 
+    if (command == "version") {
+        console::Printf(console::kColorCyan, "awake %s\n", version::kVersion);
+        return 0;
+    }
     if (command == "help" || command == "/?" || command == "-h" || command == "--help") {
         PrintHelp();
         return 0;
