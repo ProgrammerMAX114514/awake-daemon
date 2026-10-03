@@ -30,7 +30,7 @@ The paths to the toolchain are configured in `build.bat`; adjust them to match y
 
 ## Build
 
-Run `build.bat` from the project root. It initializes the MSVC x64 environment, configures CMake with the Visual Studio 2026 generator and builds the Release configuration. The executables are written to:
+Run `utils\build.bat` (from any directory). It initializes the MSVC x64 environment, configures CMake with the Visual Studio 2026 generator and builds the Release configuration. The executables are written to:
 
 ```
 build\Release\awake.exe
@@ -79,7 +79,9 @@ While any listed image name is running, the daemon blocks idle sleep/hibernation
 
 ```
 awake/
-├── build.bat          One-shot build script (MSVC x64 + CMake)
+├── utils/
+│   ├── build.bat      One-shot build script (MSVC x64 + CMake)
+│   └── pubrelease.bat Release script: tag + build + zip (needs 7-Zip)
 ├── CMakeLists.txt     Build definition (targets: awake, awake.daemon)
 ├── common/            Code shared by client and daemon
 │   ├── include/       console (colors), config (awake.ini),

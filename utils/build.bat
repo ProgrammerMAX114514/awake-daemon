@@ -17,14 +17,19 @@ rem AI-GENERATED SOFTWARE: this file was generated with AI assistance.
 rem Please review it carefully before use. The author is not liable for
 rem any consequences arising from the use of this software.
 rem =============================================================================
-rem awake - one-shot build script
+rem awake - one-shot build script (lives in utils\)
 rem
 rem Sets up the MSVC x64 environment, then configures and builds the project
 rem with CMake (Visual Studio 2026 generator, Release configuration).
 rem The resulting executables are placed in build\Release\.
+rem The script can be invoked from any working directory; it always operates
+rem on the repository root (the parent of utils\).
 rem =============================================================================
 
 setlocal
+
+rem Change to the repository root (parent of the directory holding this file).
+cd /d "%~dp0.."
 
 echo [build] Setting up MSVC x64 environment...
 call "F:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat" x64

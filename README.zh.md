@@ -30,7 +30,7 @@
 
 ## 构建
 
-在项目根目录运行 `build.bat`。它会初始化 MSVC x64 环境，使用 Visual Studio 2026 生成器配置 CMake 并构建 Release 配置。产物位于：
+在任意目录运行 `utils\build.bat`。它会初始化 MSVC x64 环境，使用 Visual Studio 2026 生成器配置 CMake 并构建 Release 配置。产物位于：
 
 ```
 build\Release\awake.exe
@@ -79,7 +79,9 @@ notepad.exe
 
 ```
 awake/
-├── build.bat          一键构建脚本（MSVC x64 + CMake）
+├── utils/
+│   ├── build.bat      一键构建脚本（MSVC x64 + CMake）
+│   └── pubrelease.bat 发布脚本：打 tag + 构建 + 打 zip 包（需要 7-Zip）
 ├── CMakeLists.txt     构建定义（目标：awake、awake.daemon）
 ├── common/            客户端与守护进程共用代码
 │   ├── include/       console（彩色输出）、config（awake.ini）、
