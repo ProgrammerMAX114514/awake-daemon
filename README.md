@@ -17,6 +17,7 @@ Current version: **0.2.0-beta**
 - **Keep-awake** (`awake 1`): blocks *idle* sleep and hibernation only. Manual sleep via the power button, the Start menu, or sleep commands issued by other applications still works normally.
 - **Screen keep-awake** (`awake screen on`): additionally keeps the screen on - blocks the display turning off, the screensaver and the lock screen caused by idle timeout.
 - **Application watch list**: image names configured in `awake.ini`; while any of them is running, the daemon blocks idle sleep/hibernation the same way (checked every 30 seconds).
+- **Daemon autostart** (`awake daemon enable`): optionally starts the daemon automatically at logon (written to the per-user registry Run key, no admin rights needed).
 - **Colored console output** via ANSI escape sequences.
 - The client starts the daemon automatically when needed (for `awake 0` / `awake 1`).
 
@@ -52,6 +53,8 @@ awake screen on         Keep the screen on (blocks screen off, screensaver and i
 awake screen off        Stop keeping the screen on.
 awake daemon on         Start the background daemon.
 awake daemon off        Stop the background daemon.
+awake daemon enable     Start the daemon automatically at logon (per-user registry Run key).
+awake daemon disable    Do not start the daemon automatically at logon.
 awake reload            Re-read the configuration file immediately.
 awake reset             Reset the configuration file (asks for confirmation).
 awake add <imagename>   Add an image name to the watch list.

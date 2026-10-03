@@ -47,6 +47,11 @@ int CmdStatus();
 int CmdDaemonOn();
 int CmdDaemonOff();
 
+// "awake daemon enable" / "awake daemon disable": manage the daemon
+// autostart at logon (per-user registry Run key).
+int CmdDaemonEnable();
+int CmdDaemonDisable();
+
 // "awake reload": ask the daemon to re-read the configuration file now.
 int CmdReload();
 

@@ -62,6 +62,7 @@ add_executable(awake
     main/src/main.cpp
     main/src/commands.cpp
     main/src/status.cpp
+    main/src/autostart.cpp
 )
 target_include_directories(awake PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/main/include)
 target_link_libraries(awake PRIVATE awake_common)

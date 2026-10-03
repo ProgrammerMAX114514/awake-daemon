@@ -32,6 +32,8 @@
 //   awake screen off        stop keeping the screen on
 //   awake daemon on         start the daemon
 //   awake daemon off        stop the daemon
+//   awake daemon enable     enable daemon autostart at logon (registry)
+//   awake daemon disable    disable daemon autostart at logon
 //   awake reload            re-read the configuration file immediately
 //   awake reset             reset the configuration file (asks confirmation)
 //   awake add <imagename>   add an image name to the watch list
@@ -86,13 +88,15 @@ int main(int argc, char** argv) {
     }
     if (command == "daemon" || command == "d") {
         if (argc < 3) {
-            console::PrintLine(console::kColorRed, "Error: missing daemon subcommand (on or off).");
+            console::PrintLine(console::kColorRed, "Error: missing daemon subcommand (on, off, enable or disable).");
             return 1;
         }
         const std::string sub = argv[2];
         if (sub == "on" || sub == "1" || sub == "start")  return cli::CmdDaemonOn();
         if (sub == "off" || sub == "0" || sub == "stop")  return cli::CmdDaemonOff();
-        console::Printf(console::kColorRed, "Error: unknown daemon subcommand '%s' (expected on/1/start or off/0/stop).\n", argv[2]);
+        if (sub == "enable")  return cli::CmdDaemonEnable();
+        if (sub == "disable") return cli::CmdDaemonDisable();
+        console::Printf(console::kColorRed, "Error: unknown daemon subcommand '%s' (expected on/1/start, off/0/stop, enable or disable).\n", argv[2]);
         return 1;
     }
     if (command == "screen" || command == "scr") {

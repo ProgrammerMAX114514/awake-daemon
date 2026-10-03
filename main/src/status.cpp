@@ -34,6 +34,7 @@
 #include <string>
 #include <vector>
 
+#include "autostart.h"
 #include "config.h"
 #include "console.h"
 #include "ipc.h"
@@ -103,6 +104,16 @@ int cli::CmdStatus() {
         console::Printf(console::kColorYellow, "INACTIVE");
         console::Printf(console::kColorReset,
                         " (the screen may turn off on idle).\n");
+    }
+
+    // Daemon autostart state comes from the registry (per-user Run key).
+    console::Printf(console::kColorReset, "Autostart:  ");
+    if (autostart::IsEnabled()) {
+        console::Printf(console::kColorGreen, "ENABLED");
+        console::Printf(console::kColorReset, " (the daemon starts at logon).\n");
+    } else {
+        console::Printf(console::kColorReset, "DISABLED");
+        console::Printf(console::kColorReset, " (use 'awake daemon enable' to enable).\n");
     }
 
     // The watch list always comes from the configuration file, so it is

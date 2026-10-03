@@ -29,6 +29,7 @@
 #include <iostream>
 #include <string>
 
+#include "autostart.h"
 #include "config.h"
 #include "console.h"
 #include "ipc.h"
@@ -53,6 +54,8 @@ void cli::PrintHelp() {
     console::Printf(console::kColorReset,   "  awake screen off        %sStop keeping the screen on.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake daemon on         %sStart the background daemon.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake daemon off        %sStop the background daemon.\n", console::kColorReset);
+    console::Printf(console::kColorReset,   "  awake daemon enable     %sStart the daemon automatically at logon.\n", console::kColorReset);
+    console::Printf(console::kColorReset,   "  awake daemon disable    %sDo not start the daemon automatically at logon.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake reload            %sRe-read the configuration file immediately.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake reset             %sReset the configuration file (asks for confirmation).\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake add <imagename>   %sAdd an image name to the watch list.\n", console::kColorReset);
@@ -175,6 +178,36 @@ int cli::CmdDaemonOff() {
         return 1;
     }
     console::PrintLine(console::kColorGreen, "The daemon has been stopped.");
+    return 0;
+}
+
+// "awake daemon enable": register the daemon for autostart at logon.
+int cli::CmdDaemonEnable() {
+    if (autostart::IsEnabled()) {
+        console::PrintLine(console::kColorYellow, "Daemon autostart is already enabled.");
+        return 0;
+    }
+    std::string error;
+    if (!autostart::Enable(error)) {
+        console::Printf(console::kColorRed, "Error: %s.\n", error.c_str());
+        return 1;
+    }
+    console::PrintLine(console::kColorGreen, "Daemon autostart ENABLED. The daemon will start at logon.");
+    return 0;
+}
+
+// "awake daemon disable": remove the daemon autostart registration.
+int cli::CmdDaemonDisable() {
+    if (!autostart::IsEnabled()) {
+        console::PrintLine(console::kColorYellow, "Daemon autostart is already disabled.");
+        return 0;
+    }
+    std::string error;
+    if (!autostart::Disable(error)) {
+        console::Printf(console::kColorRed, "Error: %s.\n", error.c_str());
+        return 1;
+    }
+    console::PrintLine(console::kColorGreen, "Daemon autostart DISABLED. The daemon will not start at logon.");
     return 0;
 }
 
