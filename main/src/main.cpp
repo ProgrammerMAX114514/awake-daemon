@@ -70,39 +70,40 @@ int main(int argc, char** argv) {
         console::Printf(console::kColorCyan, "awake %s\n", version::kVersion);
         return 0;
     }
-    if (command == "help" || command == "/?" || command == "-h" || command == "--help") {
+    if (command == "help" || command == "?" || command == "h" ||
+        command == "/?" || command == "-h" || command == "--help") {
         cli::PrintHelp();
         return 0;
     }
-    if (command == "0") {
+    if (command == "0" || command == "off" || command == "disable" || command == "stop") {
         return cli::CmdSetKeepAwake(false);
     }
-    if (command == "1") {
+    if (command == "1" || command == "on" || command == "enable" || command == "start") {
         return cli::CmdSetKeepAwake(true);
     }
-    if (command == "status") {
+    if (command == "status" || command == "st") {
         return cli::CmdStatus();
     }
-    if (command == "daemon") {
+    if (command == "daemon" || command == "d") {
         if (argc < 3) {
             console::PrintLine(console::kColorRed, "Error: missing daemon subcommand (on or off).");
             return 1;
         }
         const std::string sub = argv[2];
-        if (sub == "on")  return cli::CmdDaemonOn();
-        if (sub == "off") return cli::CmdDaemonOff();
-        console::Printf(console::kColorRed, "Error: unknown daemon subcommand '%s' (expected on or off).\n", argv[2]);
+        if (sub == "on" || sub == "1" || sub == "start")  return cli::CmdDaemonOn();
+        if (sub == "off" || sub == "0" || sub == "stop")  return cli::CmdDaemonOff();
+        console::Printf(console::kColorRed, "Error: unknown daemon subcommand '%s' (expected on/1/start or off/0/stop).\n", argv[2]);
         return 1;
     }
-    if (command == "screen") {
+    if (command == "screen" || command == "scr") {
         if (argc < 3) {
             console::PrintLine(console::kColorRed, "Error: missing screen subcommand (on or off).");
             return 1;
         }
         const std::string sub = argv[2];
-        if (sub == "on")  return cli::CmdSetScreenKeepAwake(true);
-        if (sub == "off") return cli::CmdSetScreenKeepAwake(false);
-        console::Printf(console::kColorRed, "Error: unknown screen subcommand '%s' (expected on or off).\n", argv[2]);
+        if (sub == "on" || sub == "1")  return cli::CmdSetScreenKeepAwake(true);
+        if (sub == "off" || sub == "0") return cli::CmdSetScreenKeepAwake(false);
+        console::Printf(console::kColorRed, "Error: unknown screen subcommand '%s' (expected on/1 or off/0).\n", argv[2]);
         return 1;
     }
     if (command == "reload") {

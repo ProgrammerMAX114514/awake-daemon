@@ -58,6 +58,8 @@ awake add <imagename>   Add an image name to the watch list.
 awake del <imagename>   Remove an image name from the watch list.
 ```
 
+Command aliases: `awake ?` and `awake h` are equivalent to `awake help`; `awake off`, `disable`, `stop` are equivalent to `awake 0`; `awake on`, `enable`, `start` are equivalent to `awake 1`; `awake st` is equivalent to `awake status`; `awake scr` is equivalent to `awake screen`; `awake screen 1` / `screen 0` are equivalent to `screen on` / `screen off`; `awake d` is equivalent to `awake daemon`; `awake daemon 1` / `daemon start` are equivalent to `daemon on`; `awake daemon 0` / `daemon stop` are equivalent to `daemon off`.
+
 Notes:
 
 - `awake 0` and `awake 1` start the daemon automatically if it is not running.

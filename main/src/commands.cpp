@@ -65,6 +65,10 @@ void cli::PrintHelp() {
     console::PrintLine(console::kColorReset, "    blocks idle sleep/hibernation as well.");
     console::PrintLine(console::kColorReset, "  - 'awake 0' and 'awake 1' start the daemon automatically when needed;");
     console::PrintLine(console::kColorReset, "    'awake status' never does.");
+    console::PrintLine(console::kColorReset, "  - Command aliases: '?', 'h' = help; 'off', 'disable', 'stop' = 0;");
+    console::PrintLine(console::kColorReset, "    'on', 'enable', 'start' = 1; 'st' = status; 'scr' = screen;");
+    console::PrintLine(console::kColorReset, "    'screen 1/0' = 'screen on/off'; 'd' = daemon; 'daemon 1/start' =");
+    console::PrintLine(console::kColorReset, "    'daemon on'; 'daemon 0/stop' = 'daemon off'.");
 }
 
 // -----------------------------------------------------------------------------

@@ -58,6 +58,8 @@ awake add <imagename>   向监视列表添加映像名。
 awake del <imagename>   从监视列表删除映像名。
 ```
 
+命令别名：`awake ?` 和 `awake h` 等价于 `awake help`；`awake off`、`disable`、`stop` 等价于 `awake 0`；`awake on`、`enable`、`start` 等价于 `awake 1`；`awake st` 等价于 `awake status`；`awake scr` 等价于 `awake screen`；`awake screen 1` / `screen 0` 等价于 `screen on` / `screen off`；`awake d` 等价于 `awake daemon`；`awake daemon 1` / `daemon start` 等价于 `daemon on`；`awake daemon 0` / `daemon stop` 等价于 `daemon off`。
+
 说明：
 
 - `awake 0` 和 `awake 1` 在守护进程未运行时会自动启动它。
