@@ -28,7 +28,7 @@
 # pipe IPC and process enumeration helpers.
 # =============================================================================
 cmake_minimum_required(VERSION 3.15)
-project(awake VERSION 0.1.0 LANGUAGES CXX)
+project(awake VERSION 0.2.0 LANGUAGES CXX)
 
 # Use C++17 for both targets.
 set(CMAKE_CXX_STANDARD 17)
