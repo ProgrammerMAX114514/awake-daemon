@@ -217,7 +217,8 @@ static int CmdStatus() {
                             console::kColorYellow, console::kColorReset);
         }
     } else {
-        console::Printf(console::kColorGreen, "Keep-awake: ENABLED");
+        console::Printf(console::kColorReset, "Keep-awake: ");
+        console::Printf(console::kColorGreen, "ENABLED");
         // Explain why the daemon is currently blocking sleep.
         if (info.manual && info.app) {
             console::Printf(console::kColorReset, " (manually set and a watched application is running)");
@@ -230,11 +231,13 @@ static int CmdStatus() {
     }
 
     if (info.screen) {
-        console::Printf(console::kColorGreen, "Screen:     ENABLED");
+        console::Printf(console::kColorReset, "Screen:     ");
+        console::Printf(console::kColorGreen, "ENABLED");
         console::Printf(console::kColorReset,
                         " (screen off, screensaver and idle lock are blocked).\n");
     } else {
-        console::Printf(console::kColorYellow, "Screen:     INACTIVE");
+        console::Printf(console::kColorReset, "Screen:     ");
+        console::Printf(console::kColorYellow, "INACTIVE");
         console::Printf(console::kColorReset,
                         " (the screen may turn off on idle).\n");
     }
