@@ -58,7 +58,12 @@ target_include_directories(awake_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/commo
 # -----------------------------------------------------------------------------
 # Client: awake.exe
 # -----------------------------------------------------------------------------
-add_executable(awake main/src/main.cpp)
+add_executable(awake
+    main/src/main.cpp
+    main/src/commands.cpp
+    main/src/status.cpp
+)
+target_include_directories(awake PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/main/include)
 target_link_libraries(awake PRIVATE awake_common)
 
 # -----------------------------------------------------------------------------
