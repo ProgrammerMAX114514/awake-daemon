@@ -32,14 +32,14 @@ namespace version {
 
 // Semantic version components.
 const int kMajor = 0;
-const int kMinor = 2;
+const int kMinor = 3;
 const int kPatch = 0;
 
 // Pre-release suffix ("" for stable releases).
 const char* const kSuffix = "-beta";
 
-// Full version string, assembled from the components above, e.g. "0.2.0-beta".
-const char* const kVersion = "0.2.0-beta";
+// Full version string, assembled from the components above, e.g. "0.3.0-beta".
+const char* const kVersion = "0.3.0-beta";
 
 } // namespace version
 
