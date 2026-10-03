@@ -80,6 +80,10 @@ bool IsValidImageName(const std::string& imageName);
 // comparisons of image names.
 std::string ToLowerAscii(const std::string& text);
 
+// Removes leading and trailing blanks (spaces, tabs, carriage returns and
+// line feeds) from text. Used for configuration lines and user input.
+std::string TrimText(const std::string& text);
+
 } // namespace config
 
 #endif // AWAKE_CONFIG_H

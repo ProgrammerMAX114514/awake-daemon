@@ -337,19 +337,7 @@ static int CmdReload() {
 }
 
 // Removes leading and trailing blanks from a line of user input.
-static std::string TrimInput(const std::string& text) {
-    size_t begin = 0;
-    size_t end = text.size();
-    while (begin < end && (text[begin] == ' ' || text[begin] == '\t' ||
-                           text[begin] == '\r' || text[begin] == '\n')) {
-        ++begin;
-    }
-    while (end > begin && (text[end - 1] == ' ' || text[end - 1] == '\t' ||
-                           text[end - 1] == '\r' || text[end - 1] == '\n')) {
-        --end;
-    }
-    return text.substr(begin, end - begin);
-}
+// (Implemented by config::TrimText in the common module.)
 
 // "awake reset": restore the configuration file to its initial state. The
 // user must confirm the destructive operation with an explicit "y"/"yes";
@@ -373,7 +361,7 @@ static int CmdReset() {
     if (!std::getline(std::cin, answer)) {
         answer.clear(); // stdin closed: treat as "no"
     }
-    const std::string normalized = config::ToLowerAscii(TrimInput(answer));
+    const std::string normalized = config::ToLowerAscii(config::TrimText(answer));
     if (normalized != "y" && normalized != "yes") {
         console::PrintLine(console::kColorYellow, "Aborted. The configuration file was not changed.");
         return 0;

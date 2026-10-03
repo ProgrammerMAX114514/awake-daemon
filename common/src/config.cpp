@@ -112,6 +112,12 @@ bool WriteAllLines(const std::string& path, const std::vector<std::string>& line
 
 } // namespace
 
+// Removes leading and trailing blanks from text. Public wrapper around the
+// internal Trim() helper, also used by the client for user input lines.
+std::string TrimText(const std::string& text) {
+    return Trim(text);
+}
+
 std::string GetExeDirectory() {
     char path[MAX_PATH] = { 0 };
     GetModuleFileNameA(NULL, path, MAX_PATH);
