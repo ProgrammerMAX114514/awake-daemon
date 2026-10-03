@@ -69,5 +69,11 @@ target_link_libraries(awake PRIVATE awake_common)
 # -----------------------------------------------------------------------------
 # Daemon: awake.daemon.exe
 # -----------------------------------------------------------------------------
-add_executable(awake.daemon daemon/src/daemon.cpp)
+add_executable(awake.daemon
+    daemon/src/main.cpp
+    daemon/src/state.cpp
+    daemon/src/power.cpp
+    daemon/src/server.cpp
+)
+target_include_directories(awake.daemon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/daemon/include)
 target_link_libraries(awake.daemon PRIVATE awake_common)
