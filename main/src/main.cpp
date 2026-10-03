@@ -26,12 +26,10 @@
 //   awake help              print help
 //   awake 0                 disable keep-awake
 //   awake 1                 enable keep-awake
-//   awake status            show keep-awake status (never starts the daemon)
+//   awake status            show daemon/keep-awake/screen/watch list status
 //   awake screen on         keep the screen on (block screen off/screensaver/idle lock)
 //   awake screen off        stop keeping the screen on
-//   awake screen status     show screen keep-awake status
 //   awake daemon on         start the daemon
-//   awake daemon status     show daemon status + watched applications
 //   awake daemon off        stop the daemon
 //   awake reload            re-read the configuration file immediately
 //   awake reset             reset the configuration file (asks confirmation)
@@ -39,8 +37,8 @@
 //   awake del <imagename>   remove an image name from the watch list
 //
 // "awake 0" and "awake 1" start the daemon automatically when it is not
-// running. "awake status" and "awake daemon status" deliberately never do,
-// because their purpose is to report the current state.
+// running. "awake status" deliberately never does, because its purpose is
+// to report the current state.
 // =============================================================================
 
 #include <windows.h>
@@ -70,12 +68,10 @@ static void PrintHelp() {
     console::Printf(console::kColorReset,   "  awake help              %sShow this help message.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake 0                 %sDisable keep-awake (restore default power behavior).\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake 1                 %sEnable keep-awake (block idle sleep and hibernation).\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake status            %sShow the current keep-awake status.\n", console::kColorReset);
+    console::Printf(console::kColorReset,   "  awake status            %sShow daemon, keep-awake, screen and watch list status.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake screen on         %sKeep the screen on (blocks screen off, screensaver and idle lock).\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake screen off        %sStop keeping the screen on.\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake screen status     %sShow the current screen keep-awake status.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake daemon on         %sStart the background daemon.\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake daemon status     %sShow daemon status and watched applications.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake daemon off        %sStop the background daemon.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake reload            %sRe-read the configuration file immediately.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake reset             %sReset the configuration file (asks for confirmation).\n", console::kColorReset);
@@ -183,31 +179,28 @@ static bool QueryDaemonStatus(DaemonStatus& info) {
     return true;
 }
 
-// Prints the "screen keep-awake" status line for the current state.
-static void PrintScreenStatusLine(bool screenEnabled) {
-    if (screenEnabled) {
-        console::Printf(console::kColorGreen, "Screen keep-awake is ENABLED");
-        console::Printf(console::kColorReset,
-                        " (screen off, screensaver and idle lock are blocked).\n");
-    } else {
-        console::Printf(console::kColorYellow, "Screen keep-awake is INACTIVE");
-        console::Printf(console::kColorReset,
-                        " (the screen may turn off on idle).\n");
-    }
-}
-
-// "awake status": report the state without ever starting the daemon.
+// "awake status": the single status command. It reports the daemon state,
+// the keep-awake state, the screen keep-awake state and the watch list
+// (green entries are running, red entries are not) in one view. It never
+// starts the daemon; when the daemon is not running, the keep-awake states
+// are inactive by definition and the watch list is checked locally.
 static int CmdStatus() {
-    if (!ipc::IsDaemonRunning()) {
-        console::PrintLine(console::kColorYellow, "Daemon is not running.");
-        console::Printf(console::kColorReset, "Keep-awake is %sINACTIVE%s (the system uses its default power behavior).\n",
-                        console::kColorYellow, console::kColorReset);
-        PrintScreenStatusLine(false);
-        return 0;
+    console::Printf(console::kColorReset, "Daemon:     ");
+    const bool running = ipc::IsDaemonRunning();
+    if (running) {
+        console::PrintLine(console::kColorGreen, "running");
+    } else {
+        console::PrintLine(console::kColorRed, "not running");
     }
 
+    // Keep-awake and screen states are authoritative only while the daemon
+    // runs; without it they are inactive by definition.
     DaemonStatus info;
-    if (!QueryDaemonStatus(info)) {
+    info.manual = false;
+    info.app = false;
+    info.screen = false;
+    info.active = false;
+    if (running && !QueryDaemonStatus(info)) {
         console::PrintLine(console::kColorRed, "Error: lost contact with the daemon.");
         return 1;
     }
@@ -217,14 +210,14 @@ static int CmdStatus() {
         // blocked as a side effect (the display must stay on), so spell
         // that out instead of claiming default power behavior.
         if (info.screen) {
-            console::Printf(console::kColorReset, "Keep-awake is %sINACTIVE%s (screen keep-awake is also blocking idle sleep).\n",
+            console::Printf(console::kColorReset, "Keep-awake: %sINACTIVE%s (screen keep-awake is also blocking idle sleep).\n",
                             console::kColorYellow, console::kColorReset);
         } else {
-            console::Printf(console::kColorReset, "Keep-awake is %sINACTIVE%s (the system uses its default power behavior).\n",
+            console::Printf(console::kColorReset, "Keep-awake: %sINACTIVE%s (the system uses its default power behavior).\n",
                             console::kColorYellow, console::kColorReset);
         }
     } else {
-        console::Printf(console::kColorGreen, "Keep-awake is ENABLED");
+        console::Printf(console::kColorGreen, "Keep-awake: ENABLED");
         // Explain why the daemon is currently blocking sleep.
         if (info.manual && info.app) {
             console::Printf(console::kColorReset, " (manually set and a watched application is running)");
@@ -235,7 +228,33 @@ static int CmdStatus() {
         }
         console::Printf(console::kColorReset, ".\n");
     }
-    PrintScreenStatusLine(info.screen);
+
+    if (info.screen) {
+        console::Printf(console::kColorGreen, "Screen:     ENABLED");
+        console::Printf(console::kColorReset,
+                        " (screen off, screensaver and idle lock are blocked).\n");
+    } else {
+        console::Printf(console::kColorYellow, "Screen:     INACTIVE");
+        console::Printf(console::kColorReset,
+                        " (the screen may turn off on idle).\n");
+    }
+
+    // The watch list always comes from the configuration file, so it is
+    // shown even when the daemon is not running (checked locally then).
+    const std::vector<std::string> watchList = config::ReadWatchList();
+    console::Printf(console::kColorReset, "Watch list (%s):\n", config::GetConfigPath().c_str());
+    if (watchList.empty()) {
+        console::PrintLine(console::kColorYellow, "  (empty - use 'awake add <imagename>' to add entries)");
+        return 0;
+    }
+    const std::set<std::string> runningNames = process::FindRunningImages(watchList);
+    for (size_t i = 0; i < watchList.size(); ++i) {
+        if (runningNames.count(config::ToLowerAscii(watchList[i])) > 0) {
+            console::Printf(console::kColorGreen, "  %s (running)\n", watchList[i].c_str());
+        } else {
+            console::Printf(console::kColorRed, "  %s (not running)\n", watchList[i].c_str());
+        }
+    }
     return 0;
 }
 
@@ -261,23 +280,6 @@ static int CmdSetScreenKeepAwake(bool enable) {
     return 1;
 }
 
-// "awake screen status": report the screen keep-awake state without ever
-// starting the daemon.
-static int CmdScreenStatus() {
-    if (!ipc::IsDaemonRunning()) {
-        console::PrintLine(console::kColorYellow, "Daemon is not running.");
-        PrintScreenStatusLine(false);
-        return 0;
-    }
-    DaemonStatus info;
-    if (!QueryDaemonStatus(info)) {
-        console::PrintLine(console::kColorRed, "Error: lost contact with the daemon.");
-        return 1;
-    }
-    PrintScreenStatusLine(info.screen);
-    return 0;
-}
-
 // "awake daemon on": launch the daemon unless it is already running.
 static int CmdDaemonOn() {
     if (ipc::IsDaemonRunning()) {
@@ -297,57 +299,6 @@ static int CmdDaemonOn() {
         return 1;
     }
     console::PrintLine(console::kColorGreen, "The daemon is now running.");
-    return 0;
-}
-
-// "awake daemon status": running state, keep-awake state and the watch list
-// with green entries for running applications and red entries for the rest.
-static int CmdDaemonStatus() {
-    const bool running = ipc::IsDaemonRunning();
-    console::Printf(console::kColorReset, "Daemon:     ");
-    if (running) {
-        console::PrintLine(console::kColorGreen, "running");
-    } else {
-        console::PrintLine(console::kColorRed, "not running");
-    }
-
-    // When the daemon runs, it knows the authoritative state.
-    if (running) {
-        DaemonStatus info;
-        if (QueryDaemonStatus(info)) {
-            if (info.manual || info.app) {
-                console::Printf(console::kColorGreen, "Keep-awake: enabled%s\n", console::kColorReset);
-            } else {
-                console::Printf(console::kColorReset, "Keep-awake: disabled\n");
-            }
-            if (info.screen) {
-                console::Printf(console::kColorGreen, "Screen:     enabled%s\n", console::kColorReset);
-            } else {
-                console::Printf(console::kColorReset, "Screen:     disabled\n");
-            }
-        } else {
-            console::Printf(console::kColorRed, "Keep-awake: unknown (lost contact with the daemon)\n");
-        }
-    }
-
-    // The watch list always comes from the configuration file, so it is
-    // shown even when the daemon is not running. The running check is done
-    // locally in that case.
-    const std::vector<std::string> watchList = config::ReadWatchList();
-    console::Printf(console::kColorReset, "Watch list (%s):\n", config::GetConfigPath().c_str());
-    if (watchList.empty()) {
-        console::PrintLine(console::kColorYellow, "  (empty - use 'awake add <imagename>' to add entries)");
-        return 0;
-    }
-
-    const std::set<std::string> runningNames = process::FindRunningImages(watchList);
-    for (size_t i = 0; i < watchList.size(); ++i) {
-        if (runningNames.count(config::ToLowerAscii(watchList[i])) > 0) {
-            console::Printf(console::kColorGreen, "  %s (running)\n", watchList[i].c_str());
-        } else {
-            console::Printf(console::kColorRed, "  %s (not running)\n", watchList[i].c_str());
-        }
-    }
     return 0;
 }
 
@@ -507,26 +458,24 @@ int main(int argc, char** argv) {
     }
     if (command == "daemon") {
         if (argc < 3) {
-            console::PrintLine(console::kColorRed, "Error: missing daemon subcommand (on, status or off).");
+            console::PrintLine(console::kColorRed, "Error: missing daemon subcommand (on or off).");
             return 1;
         }
         const std::string sub = argv[2];
         if (sub == "on")    return CmdDaemonOn();
-        if (sub == "status") return CmdDaemonStatus();
         if (sub == "off")   return CmdDaemonOff();
-        console::Printf(console::kColorRed, "Error: unknown daemon subcommand '%s' (expected on, status or off).\n", argv[2]);
+        console::Printf(console::kColorRed, "Error: unknown daemon subcommand '%s' (expected on or off).\n", argv[2]);
         return 1;
     }
     if (command == "screen") {
         if (argc < 3) {
-            console::PrintLine(console::kColorRed, "Error: missing screen subcommand (on, status or off).");
+            console::PrintLine(console::kColorRed, "Error: missing screen subcommand (on or off).");
             return 1;
         }
         const std::string sub = argv[2];
-        if (sub == "on")     return CmdSetScreenKeepAwake(true);
-        if (sub == "off")    return CmdSetScreenKeepAwake(false);
-        if (sub == "status") return CmdScreenStatus();
-        console::Printf(console::kColorRed, "Error: unknown screen subcommand '%s' (expected on, status or off).\n", argv[2]);
+        if (sub == "on")  return CmdSetScreenKeepAwake(true);
+        if (sub == "off") return CmdSetScreenKeepAwake(false);
+        console::Printf(console::kColorRed, "Error: unknown screen subcommand '%s' (expected on or off).\n", argv[2]);
         return 1;
     }
     if (command == "reload") {

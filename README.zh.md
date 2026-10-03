@@ -45,13 +45,12 @@ build\Release\awake.daemon.exe
 awake help              显示帮助信息。
 awake 0                 取消保持唤醒（恢复系统默认电源行为）。
 awake 1                 开启保持唤醒（阻止空闲睡眠和休眠）。
-awake status            显示当前保持唤醒状态（不会启动守护进程）。
+awake status            显示综合状态：守护进程、保持唤醒、屏幕保持和监视列表
+                        （不会启动守护进程；监视列表条目绿色表示正在运行，
+                        红色表示未运行）。
 awake screen on         让屏幕保持常亮（阻止屏幕关闭、屏幕保护和空闲锁屏）。
 awake screen off        停止让屏幕保持常亮。
-awake screen status     显示当前屏幕保持状态。
 awake daemon on         启动后台守护进程。
-awake daemon status     显示守护进程状态和受监视的应用程序
-                        （绿色 = 在配置中且正在运行，红色 = 在配置中但未运行）。
 awake daemon off        停止后台守护进程。
 awake reload            让守护进程立即重新读取配置文件。
 awake reset             重置配置文件（会要求二次确认）。

@@ -45,13 +45,12 @@ Both executables statically link the C runtime and have no runtime dependencies 
 awake help              Show the help message.
 awake 0                 Disable keep-awake (restore default power behavior).
 awake 1                 Enable keep-awake (block idle sleep and hibernation).
-awake status            Show the current keep-awake status (never starts the daemon).
+awake status            Show daemon, keep-awake, screen and watch list status
+                        (never starts the daemon; watch list entries are green
+                        when running, red when not).
 awake screen on         Keep the screen on (blocks screen off, screensaver and idle lock).
 awake screen off        Stop keeping the screen on.
-awake screen status     Show the current screen keep-awake status.
 awake daemon on         Start the background daemon.
-awake daemon status     Show daemon status and the watched applications
-                        (green = configured and running, red = configured but not running).
 awake daemon off        Stop the background daemon.
 awake reload            Re-read the configuration file immediately.
 awake reset             Reset the configuration file (asks for confirmation).
