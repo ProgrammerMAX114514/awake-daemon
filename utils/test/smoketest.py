@@ -65,6 +65,7 @@ def load_config(path):
         "release_dir": os.path.abspath(os.path.join(REPO_ROOT, parser.get("paths", "release_dir"))),
         "client_exe": parser.get("paths", "client_exe"),
         "daemon_exe": parser.get("paths", "daemon_exe"),
+        "pipe_name": parser.get("ipc", "pipe_name"),
         "test_app": parser.get("watch", "test_app"),
         "keep_window_open": parser.getboolean("watch", "keep_window_open"),
         "registry_key": parser.get("autostart", "registry_key"),
@@ -169,6 +170,48 @@ def test_daemon_lifecycle(cfg):
     check("status shows the daemon running", code == 0 and "Daemon:" in out and "running" in out)
 
 
+def write_pipe_garbage(cfg, payload_bytes):
+    """Connects to the daemon pipe, writes raw bytes WITHOUT a newline and
+    disconnects (simulates a hostile/broken client). Uses PowerShell
+    because Python's stdlib cannot open a named pipe client directly."""
+    script = (
+        "$p = new-object System.IO.Pipes.NamedPipeClientStream('.', '%s', "
+        "[System.IO.Pipes.PipeDirection]::InOut); "
+        "$p.Connect(2000); $b = New-Object byte[] %d; "
+        "$r = (New-Object Random).NextBytes($b); $p.Write($b, 0, %d); "
+        "$p.Flush(); $p.Close()"
+    ) % (cfg["pipe_name"], payload_bytes, payload_bytes)
+    subprocess.run(["powershell", "-NoProfile", "-Command", script],
+                   capture_output=True, timeout=cfg["command_timeout_s"])
+
+
+def corrupt_autostart_path(cfg, fake_path):
+    """Overwrites the autostart registry value with a command line pointing
+    to a nonexistent executable (simulates a stale entry)."""
+    data = '"%s" --internal-daemon awake-internal-daemon-launch' % fake_path
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, cfg["registry_key"], 0, winreg.KEY_SET_VALUE) as key:
+        winreg.SetValueEx(key, cfg["value_name"], 0, winreg.REG_SZ, data)
+
+
+def test_version_handshake(cfg):
+    # With client and daemon from the same build there must be no mismatch
+    # warning in the status output.
+    code, out = run_client(cfg, ["st"])
+    check("version handshake passes for matching versions",
+          code == 0 and "mismatch" not in out.lower() and "did not report" not in out.lower(),
+          out.strip())
+
+
+def test_protocol_robustness(cfg):
+    # A hostile client writing 4 KB without a newline must not grow the
+    # daemon's buffer or break the server loop: the next request is served
+    # normally afterwards (R1 hardening).
+    write_pipe_garbage(cfg, 4096)
+    code, out = run_client(cfg, ["st"])
+    check("daemon survives an oversized request and keeps serving",
+          code == 0 and "running" in out, out.strip())
+
+
 def test_keep_awake(cfg):
     code, out = run_client(cfg, ["1"])
     check("awake 1 enables keep-awake", code == 0 and "ENABLED" in out, out.strip())
@@ -270,6 +313,21 @@ def test_autostart(cfg):
     check("status reports autostart ENABLED",
           code == 0 and "Autostart:" in out and "ENABLED" in out, out.strip())
 
+    # Stale-entry detection (R12): corrupt the registered path, status must
+    # call it out; re-enabling repairs the entry.
+    corrupt_autostart_path(cfg, "E:\\nonexistent-path\\awake.daemon.exe")
+    code, out = run_client(cfg, ["st"])
+    check("status flags a stale autostart entry",
+          code == 0 and "STALE" in out, out.strip())
+
+    code, out = run_client(cfg, ["daemon", "enable"])
+    check("re-enabling repairs a stale autostart entry",
+          code == 0 and "ENABLED" in out, out.strip())
+    code, out = run_client(cfg, ["st"])
+    check("status shows ENABLED after the repair",
+          code == 0 and "Autostart:" in out and "ENABLED" in out and "STALE" not in out,
+          out.strip())
+
     code, out = run_client(cfg, ["daemon", "disable"])
     check("daemon disable removes autostart",
           code == 0 and "DISABLED" in out, out.strip())
@@ -317,6 +375,8 @@ def main():
     test_version_and_help(cfg)
     test_status_without_daemon(cfg)
     test_daemon_lifecycle(cfg)
+    test_version_handshake(cfg)
+    test_protocol_robustness(cfg)
     test_keep_awake(cfg)
     test_screen_keep_awake(cfg)
     test_watch_list(cfg)

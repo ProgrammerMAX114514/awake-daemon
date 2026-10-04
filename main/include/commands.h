@@ -26,7 +26,14 @@
 #ifndef AWAKE_COMMANDS_H
 #define AWAKE_COMMANDS_H
 
+#include <string>
+
 namespace cli {
+
+// Compares the daemon's version with the client version. Returns false
+// when the major versions differ (incompatible); a minor mismatch only
+// prints a yellow warning. Call this after establishing contact.
+bool CheckDaemonVersion(const std::string& daemonVersion);
 
 // Prints the colored usage help. Shown for "awake help", for "awake"
 // without arguments and as a hint after unknown commands.

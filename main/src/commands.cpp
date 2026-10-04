@@ -75,25 +75,78 @@ void cli::PrintHelp() {
 }
 
 // -----------------------------------------------------------------------------
-// Daemon management helpers
+// Version compatibility
 // -----------------------------------------------------------------------------
 
-// Makes sure the daemon is running, starting it if necessary. Only used by
-// the commands that must talk to the daemon (0, 1).
-static bool EnsureDaemonRunning() {
-    if (ipc::IsDaemonRunning()) {
-        return true;
-    }
-    console::PrintLine(console::kColorYellow, "Daemon is not running. Starting daemon...");
-    if (!ipc::StartDaemon()) {
-        console::Printf(console::kColorRed, "Error: failed to start '%s'.\n", ipc::kDaemonExeName);
+// Extracts the major version number from a "X.Y.Z-suffix" string.
+// Returns false when the string cannot be parsed.
+static bool ParseMajorVersion(const std::string& version, int& majorOut) {
+    const size_t dot = version.find('.');
+    if (dot == std::string::npos) {
         return false;
     }
-    if (!ipc::WaitForDaemon(5000)) {
-        console::PrintLine(console::kColorRed, "Error: the daemon was started but does not respond.");
+    try {
+        majorOut = std::stoi(version.substr(0, dot));
+    } catch (...) {
         return false;
     }
     return true;
+}
+
+bool cli::CheckDaemonVersion(const std::string& daemonVersion) {
+    if (daemonVersion.empty()) {
+        // Very old daemons did not report a version; accept but warn.
+        console::PrintLine(console::kColorYellow,
+                           "Warning: the daemon did not report its version; it may be outdated.");
+        return true;
+    }
+    if (daemonVersion == version::kVersion) {
+        return true; // exact match - the normal case
+    }
+
+    int clientMajor = 0;
+    int daemonMajor = 0;
+    const bool parsed = ParseMajorVersion(version::kVersion, clientMajor) &&
+                        ParseMajorVersion(daemonVersion, daemonMajor);
+    if (parsed && clientMajor != daemonMajor) {
+        console::Printf(console::kColorRed,
+                        "Error: version mismatch - client %s, daemon %s. "
+                        "Please update both executables from the same release.\n",
+                        version::kVersion, daemonVersion.c_str());
+        return false;
+    }
+    console::Printf(console::kColorYellow,
+                    "Warning: version mismatch - client %s, daemon %s. "
+                    "Some features may not work correctly.\n",
+                    version::kVersion, daemonVersion.c_str());
+    return true;
+}
+
+// -----------------------------------------------------------------------------
+// Daemon management helpers
+// -----------------------------------------------------------------------------
+
+// Makes sure the daemon is running, starting it if necessary, and verifies
+// the version handshake. Only used by the commands that must talk to the
+// daemon (0, 1, screen on/off).
+static bool EnsureDaemonRunning() {
+    std::string daemonVersion;
+    if (!ipc::PingDaemon(daemonVersion)) {
+        console::PrintLine(console::kColorYellow, "Daemon is not running. Starting daemon...");
+        if (!ipc::StartDaemon()) {
+            console::Printf(console::kColorRed, "Error: failed to start '%s'.\n", ipc::kDaemonExeName);
+            return false;
+        }
+        if (!ipc::WaitForDaemon(5000)) {
+            console::PrintLine(console::kColorRed, "Error: the daemon was started but does not respond.");
+            return false;
+        }
+        if (!ipc::PingDaemon(daemonVersion)) {
+            console::PrintLine(console::kColorRed, "Error: the daemon stopped responding right after starting.");
+            return false;
+        }
+    }
+    return cli::CheckDaemonVersion(daemonVersion);
 }
 
 // -----------------------------------------------------------------------------
@@ -162,6 +215,11 @@ int cli::CmdDaemonOn() {
         console::PrintLine(console::kColorRed, "Error: the daemon was started but does not respond.");
         return 1;
     }
+    // Verify the version handshake; the daemon stays running either way.
+    std::string daemonVersion;
+    if (ipc::PingDaemon(daemonVersion)) {
+        cli::CheckDaemonVersion(daemonVersion);
+    }
     console::PrintLine(console::kColorGreen, "The daemon is now running.");
     return 0;
 }
@@ -182,8 +240,13 @@ int cli::CmdDaemonOff() {
 }
 
 // "awake daemon enable": register the daemon for autostart at logon.
+// Re-running this command also REPAIRS a stale entry whose registered
+// daemon path no longer exists (e.g. the folder was moved) - only a
+// healthy, existing registration short-circuits to "already enabled".
 int cli::CmdDaemonEnable() {
-    if (autostart::IsEnabled()) {
+    std::string registeredPath;
+    if (autostart::Query(registeredPath) && !registeredPath.empty() &&
+        GetFileAttributesA(registeredPath.c_str()) != INVALID_FILE_ATTRIBUTES) {
         console::PrintLine(console::kColorYellow, "Daemon autostart is already enabled.");
         return 0;
     }

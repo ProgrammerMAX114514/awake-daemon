@@ -58,7 +58,11 @@ extern const char* const kDaemonExeName;
 // cannot be reached at all.
 bool SendRequest(const std::string& request, std::string& response);
 
-// Convenience wrapper: sends "PING" and reports whether the daemon answered.
+// Sends a versioned PING ("PING <client version>") and reports the
+// daemon's version. Returns false when the daemon is not reachable.
+bool PingDaemon(std::string& daemonVersion);
+
+// Convenience wrapper: pings the daemon and reports whether it answered.
 bool IsDaemonRunning();
 
 // Starts the daemon as a detached background process. The daemon

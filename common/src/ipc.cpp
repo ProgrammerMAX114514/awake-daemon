@@ -25,6 +25,7 @@
 #include <windows.h>
 
 #include "config.h"
+#include "protocol.h"
 
 namespace ipc {
 
@@ -97,12 +98,17 @@ bool SendRequest(const std::string& request, std::string& response) {
     return true;
 }
 
-bool IsDaemonRunning() {
+bool PingDaemon(std::string& daemonVersion) {
     std::string response;
-    if (!SendRequest("PING", response)) {
+    if (!SendRequest(protocol::MakePingRequest(), response)) {
         return false;
     }
-    return response.compare(0, 7, "OK PONG") == 0;
+    return protocol::ParsePongResponse(response, daemonVersion);
+}
+
+bool IsDaemonRunning() {
+    std::string daemonVersion;
+    return PingDaemon(daemonVersion);
 }
 
 bool StartDaemon() {
@@ -155,6 +161,15 @@ bool WaitForDaemon(unsigned int timeoutMs) {
     }
 }
 
+namespace {
+
+// Maximum accepted request size. The protocol only carries short ASCII
+// command lines; a client that keeps writing without ever sending a
+// newline is dropped instead of being allowed to grow the buffer forever.
+const size_t kMaxRequestLength = 1024;
+
+} // namespace
+
 std::string ReadRequestFromPipe(void* pipeHandle) {
     HANDLE pipe = static_cast<HANDLE>(pipeHandle);
     std::string request;
@@ -165,6 +180,13 @@ std::string ReadRequestFromPipe(void* pipeHandle) {
             break; // client disconnected before sending a full line
         }
         request.append(buffer, bytesRead);
+        if (request.size() > kMaxRequestLength) {
+            // Over the cap without a terminating newline: drop the request
+            // entirely. The server answers nothing and disconnects, and the
+            // next client is served normally.
+            request.clear();
+            break;
+        }
         // Stop at the first newline; that terminates the request line.
         if (request.find('\n') != std::string::npos) {
             break;

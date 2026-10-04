@@ -68,6 +68,7 @@ int cli::CmdStatus() {
         console::PrintLine(console::kColorRed, "Error: lost contact with the daemon.");
         return 1;
     }
+    cli::CheckDaemonVersion(info.version);
 
     if (!info.manual && !info.app) {
         // When only the screen keep-awake is on, the system idle sleep is
@@ -107,13 +108,21 @@ int cli::CmdStatus() {
     }
 
     // Daemon autostart state comes from the registry (per-user Run key).
+    // A stale entry (the registered daemon exe no longer exists, e.g. the
+    // folder was moved) is called out with a repair hint.
     console::Printf(console::kColorReset, "Autostart:  ");
-    if (autostart::IsEnabled()) {
-        console::Printf(console::kColorGreen, "ENABLED");
-        console::Printf(console::kColorReset, " (the daemon starts at logon).\n");
-    } else {
+    std::string registeredPath;
+    if (!autostart::Query(registeredPath)) {
         console::Printf(console::kColorReset, "DISABLED");
         console::Printf(console::kColorReset, " (use 'awake daemon enable' to enable).\n");
+    } else if (!registeredPath.empty() &&
+               GetFileAttributesA(registeredPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+        console::Printf(console::kColorRed, "STALE");
+        console::Printf(console::kColorReset,
+                        " (the registered daemon path no longer exists - run 'awake daemon enable' to fix).\n");
+    } else {
+        console::Printf(console::kColorGreen, "ENABLED");
+        console::Printf(console::kColorReset, " (the daemon starts at logon).\n");
     }
 
     // The watch list always comes from the configuration file, so it is

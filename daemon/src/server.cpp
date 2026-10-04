@@ -33,6 +33,7 @@
 #include "process.h"
 #include "protocol.h"
 #include "state.h"
+#include "version.h"
 
 namespace server {
 
@@ -46,6 +47,7 @@ std::string HandleGetStatus() {
     status.app = daemonstate::GetAppActive();
     status.screen = daemonstate::GetScreen();
     status.active = (status.manual || status.app || status.screen);
+    status.version = version::kVersion;
     return protocol::SerializeStatus(status);
 }
 
@@ -82,7 +84,9 @@ std::string HandleRequest(const std::string& request) {
     const std::string verb = line.substr(0, firstSpace == std::string::npos ? line.size() : firstSpace);
 
     if (verb == "PING") {
-        return "OK PONG\n";
+        // Echo the daemon version back so the client can warn about
+        // client/daemon version mismatches.
+        return std::string("OK PONG ") + version::kVersion + "\n";
     }
     if (verb == "KEEP_AWAKE") {
         // The line is already trimmed, so the argument is clean.

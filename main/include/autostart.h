@@ -37,6 +37,12 @@ namespace autostart {
 // Returns true when the registry Run value currently exists.
 bool IsEnabled();
 
+// Returns true when the registry Run value exists and fills registeredPath
+// with the daemon exe path stored inside it (empty when the stored data
+// cannot be parsed). Lets the caller detect stale entries whose registered
+// executable has been moved or deleted.
+bool Query(std::string& registeredPath);
+
 // Creates/overwrites the registry Run value so that the daemon starts at
 // logon. The daemon executable is expected next to awake.exe; when it is
 // missing, the function fails and fills error with the reason.

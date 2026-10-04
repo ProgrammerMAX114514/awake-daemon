@@ -43,11 +43,21 @@ namespace protocol {
 // Request verbs (first word of the request line)
 // -----------------------------------------------------------------------------
 
-extern const char* const kReqPing;        // "PING"                  -> "OK PONG"
+extern const char* const kReqPing;        // "PING"                  -> "OK PONG <version>"
 extern const char* const kReqGetStatus;   // "GET_STATUS"            -> status response
 extern const char* const kReqGetApps;     // "GET_APPS"              -> app list response
 extern const char* const kReqReload;      // "RELOAD"                -> "OK ..."
 extern const char* const kReqShutdown;    // "SHUTDOWN"              -> "OK ..." (daemon exits)
+
+// Builds the versioned ping request line ("PING <client version>"). The
+// daemon answers "OK PONG <daemon version>"; comparing the two versions
+// lets the client warn about client/daemon mismatches.
+std::string MakePingRequest();
+
+// Parses the PING response. Returns true when the response starts with
+// "OK PONG"; daemonVersion then holds the version reported by the daemon
+// (may be empty for daemons older than the version handshake).
+bool ParsePongResponse(const std::string& response, std::string& daemonVersion);
 
 // Builds the request line for "awake 0"/"awake 1" ("KEEP_AWAKE 0|1").
 std::string MakeKeepAwakeRequest(bool enable);
@@ -66,6 +76,7 @@ struct DaemonStatus {
     bool app = false;     // a watched application is currently running
     bool screen = false;  // screen keep-awake set with "awake screen on"
     bool active = false;  // anything currently prevents idle sleep
+    std::string version;  // daemon version (empty for older daemons)
 };
 
 // Serializes a DaemonStatus into the GET_STATUS response body, starting

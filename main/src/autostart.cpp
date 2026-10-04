@@ -49,12 +49,37 @@ std::string BuildAutostartCommandLine() {
 } // namespace
 
 bool IsEnabled() {
+    std::string registeredPath;
+    return Query(registeredPath);
+}
+
+bool Query(std::string& registeredPath) {
+    registeredPath.clear();
+
     HKEY key = NULL;
     if (RegOpenKeyExA(HKEY_CURRENT_USER, kRunKeyPath, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) {
         return false; // key missing or not accessible -> treat as disabled
     }
     DWORD type = 0;
-    const LRESULT result = RegQueryValueExA(key, kValueName, NULL, &type, NULL, NULL);
+    DWORD size = 0;
+    LRESULT result = RegQueryValueExA(key, kValueName, NULL, &type, NULL, &size);
+    if (result == ERROR_SUCCESS && type == REG_SZ && size > 0) {
+        std::string data(size, '\0');
+        result = RegQueryValueExA(key, kValueName, NULL, &type,
+                                  reinterpret_cast<BYTE*>(&data[0]), &size);
+        if (result == ERROR_SUCCESS) {
+            // The stored command line looks like
+            //   "<path>\awake.daemon.exe" --internal-daemon <token>
+            // Extract the path between the first and the last quote so the
+            // caller can check whether the registered executable still
+            // exists (stale-entry detection).
+            const size_t firstQuote = data.find('"');
+            const size_t lastQuote = data.rfind('"');
+            if (firstQuote != std::string::npos && lastQuote > firstQuote) {
+                registeredPath = data.substr(firstQuote + 1, lastQuote - firstQuote - 1);
+            }
+        }
+    }
     RegCloseKey(key);
     return result == ERROR_SUCCESS && type == REG_SZ;
 }

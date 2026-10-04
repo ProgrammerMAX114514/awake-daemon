@@ -22,6 +22,8 @@
 
 #include "protocol.h"
 
+#include "version.h"
+
 namespace protocol {
 
 const char* const kReqPing      = "PING";
@@ -38,12 +40,19 @@ std::string MakeScreenRequest(bool enable) {
     return enable ? "SCREEN 1" : "SCREEN 0";
 }
 
+std::string MakePingRequest() {
+    // The client announces its own version with the ping; the daemon
+    // echoes its version back in the PONG (see ParsePongResponse).
+    return std::string(kReqPing) + " " + version::kVersion;
+}
+
 std::string SerializeStatus(const DaemonStatus& status) {
     std::string response = "OK\n";
     response += "MANUAL=" + std::string(status.manual ? "1" : "0") + "\n";
     response += "APP=" + std::string(status.app ? "1" : "0") + "\n";
     response += "SCREEN=" + std::string(status.screen ? "1" : "0") + "\n";
     response += "ACTIVE=" + std::string(status.active ? "1" : "0") + "\n";
+    response += "VERSION=" + status.version + "\n";
     return response;
 }
 
@@ -68,6 +77,8 @@ bool ParseStatusResponse(const std::string& response, DaemonStatus& status) {
             status.screen = (line.compare(7, 1, "1") == 0);
         } else if (line.compare(0, 7, "ACTIVE=") == 0) {
             status.active = (line.compare(7, 1, "1") == 0);
+        } else if (line.compare(0, 8, "VERSION=") == 0) {
+            status.version = line.substr(8);
         }
         if (lineEnd == response.size()) {
             break;
@@ -75,6 +86,20 @@ bool ParseStatusResponse(const std::string& response, DaemonStatus& status) {
         lineStart = lineEnd + 1;
     }
     return ok;
+}
+
+bool ParsePongResponse(const std::string& response, std::string& daemonVersion) {
+    daemonVersion.clear();
+    if (response.compare(0, 7, "OK PONG") != 0) {
+        return false;
+    }
+    // Everything after "OK PONG " on the first line is the daemon version.
+    const size_t lineEnd = response.find('\n');
+    const size_t versionStart = 7; // right after "OK PONG"
+    if (lineEnd != std::string::npos && lineEnd > versionStart) {
+        daemonVersion = response.substr(versionStart, lineEnd - versionStart);
+    }
+    return true;
 }
 
 } // namespace protocol
