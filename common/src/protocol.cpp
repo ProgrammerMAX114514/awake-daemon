@@ -93,9 +93,13 @@ bool ParsePongResponse(const std::string& response, std::string& daemonVersion) 
     if (response.compare(0, 7, "OK PONG") != 0) {
         return false;
     }
-    // Everything after "OK PONG " on the first line is the daemon version.
+    // Everything after "OK PONG" and the separating space on the first line
+    // is the daemon version.
     const size_t lineEnd = response.find('\n');
-    const size_t versionStart = 7; // right after "OK PONG"
+    size_t versionStart = 7; // right after "OK PONG"
+    while (versionStart < lineEnd && response[versionStart] == ' ') {
+        ++versionStart; // skip the separator space(s)
+    }
     if (lineEnd != std::string::npos && lineEnd > versionStart) {
         daemonVersion = response.substr(versionStart, lineEnd - versionStart);
     }

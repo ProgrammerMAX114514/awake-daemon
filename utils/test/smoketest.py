@@ -161,6 +161,8 @@ def test_daemon_lifecycle(cfg):
 
     code, out = run_client(cfg, ["daemon", "on"])
     check("daemon on starts the daemon", code == 0 and "now running" in out, out.strip())
+    check("daemon on reports no version mismatch",
+          "mismatch" not in out.lower(), out.strip())
 
     code, out = run_client(cfg, ["daemon", "on"])
     check("daemon on is idempotent when running",
