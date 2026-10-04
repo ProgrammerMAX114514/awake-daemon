@@ -40,6 +40,16 @@ build\Release\awake.daemon.exe
 
 Both executables statically link the C runtime and have no runtime dependencies on the build directory - copy them anywhere you like.
 
+## Testing
+
+A semi-automated smoke test lives in `utils/test/`:
+
+```
+python utils\test\smoketest.py
+```
+
+It exercises every command (including aliases and the autostart registry entry), driven by the config file `utils/test/smoketest.ini` (test application, registry location, timeouts). Steps that cannot be automated from a normal shell - colors, `powercfg /requests` verification, logon autostart, manual-sleep behavior - are printed as a manual checklist at the end.
+
 ## Usage
 
 ```
