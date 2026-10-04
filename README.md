@@ -1,5 +1,10 @@
 # awake
 
+![License](https://img.shields.io/badge/license-Apache--2.0-blue)
+![Release](https://img.shields.io/github/v/tag/ProgrammerMAX114514/awake-daemon?sort=semver&label=release)
+![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-blue)
+![Language](https://img.shields.io/badge/language-C%2B%2B17-blue)
+
 [English](README.md) | [简体中文](README.zh.md)
 
 > [!IMPORTANT]
@@ -107,6 +112,21 @@ awake/
 ```
 
 ## How it works
+
+```
++-------------------+       named pipe           +----------------------------+
+| awake.exe         |  \\.\pipe\awake_daemon     | awake.daemon.exe           |
+| (client)          |  ------------------------> | (daemon)                   |
+|  main (dispatch)  |  line-based ASCII          |  main (startup/teardown)   |
+|  commands         |  request/response          |  server (pipe loop)        |
+|  status           |                            |  state (shared flags)      |
+|  autostart        |                            |  power (30 s poll thread)  |
++-------------------+                            +----------------------------+
+                                                                 |
+                                                                 v
+                                                SetThreadExecutionState
+                                                    Windows power manager
+```
 
 - The daemon holds the Windows execution state `ES_CONTINUOUS | ES_SYSTEM_REQUIRED` via `SetThreadExecutionState`, which blocks idle sleep/hibernation without intercepting manual sleep requests.
 - A dedicated "power thread" owns all execution state calls, applies changes on demand and at least every 30 seconds, and resets the state before the daemon exits.

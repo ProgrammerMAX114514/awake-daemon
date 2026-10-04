@@ -1,5 +1,10 @@
 # awake
 
+![License](https://img.shields.io/badge/license-Apache--2.0-blue)
+![Release](https://img.shields.io/github/v/tag/ProgrammerMAX114514/awake-daemon?sort=semver&label=release)
+![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-blue)
+![Language](https://img.shields.io/badge/language-C%2B%2B17-blue)
+
 [English](README.md) | [简体中文](README.zh.md)
 
 > [!IMPORTANT]
@@ -107,6 +112,21 @@ awake/
 ```
 
 ## 工作原理
+
+```
++-------------------+       named pipe           +----------------------------+
+| awake.exe         |  \\.\pipe\awake_daemon     | awake.daemon.exe           |
+| (客户端)          |  ------------------------> | (守护进程)                 |
+|  main (分发)      |  基于行的 ASCII            |  main (启动/清理)          |
+|  commands (命令)  |  请求/应答协议             |  server (管道服务循环)     |
+|  status (状态)    |                            |  state (共享状态标志)      |
+|  autostart (自启) |                            |  power (30 秒轮询线程)     |
++-------------------+                            +----------------------------+
+                                                                 |
+                                                                 v
+                                                SetThreadExecutionState
+                                                      Windows 电源管理器
+```
 
 - 守护进程通过 `SetThreadExecutionState` 持有 Windows 执行状态 `ES_CONTINUOUS | ES_SYSTEM_REQUIRED`，该状态只阻止空闲睡眠/休眠，不拦截手动睡眠请求。
 - 一个专用的"电源线程"独占所有执行状态调用，按需并在至少每 30 秒一次的轮询中应用状态，退出前将其复位。
