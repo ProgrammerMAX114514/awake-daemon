@@ -45,7 +45,7 @@ build\Release\awake.daemon.exe
 `utils/test/` 中提供了半自动化冒烟测试：
 
 ```
-python utils	est\smoketest.py
+python utils\test\smoketest.py
 ```
 
 它会遍历所有命令（包括别名和自启注册表项）并检查行为，由配置文件 `utils/test/smoketest.ini` 驱动（测试用应用、注册表位置、超时时间）。无法在普通 shell 中自动化的步骤——颜色效果、`powercfg /requests` 交叉验证、登录自启、手动睡眠行为——会在结尾以人工检查清单的形式列出。
