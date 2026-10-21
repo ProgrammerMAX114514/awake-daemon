@@ -83,17 +83,24 @@ Notes:
 - `awake 0` and `awake 1` start the daemon automatically if it is not running.
 - The keep-awake state is kept in the daemon's memory only. After the daemon restarts it is inactive again.
 - When the daemon starts it sends a one-shot stay-awake notification to the system (resets the idle timer once), regardless of the current setting.
+- The first run prints the Apache License 2.0 and asks for acceptance; `help` and `version` work without accepting. The answer is stored in `awake.ini`, so every file written by an older version asks once after the upgrade.
+- Running the client (or the daemon) from an elevated console prints a yellow warning: such a daemon cannot be controlled from a normal shell. `awake status` marks an elevated daemon with `(elevated)`.
 
 ## Configuration file
 
-`awake.ini` lives next to `awake.exe` (portable). It is created automatically with a descriptive comment header when missing. Comments start with `#` or `;`; every other non-empty line is one image name, for example:
+`awake.ini` lives next to `awake.exe` (portable). It is created automatically with a descriptive comment header when missing. Comments start with `#` or `;`; inside `[watch]` every other non-empty line is one image name, for example:
 
 ```ini
+[license]
+license_accepted = true
+
 [watch]
 notepad.exe
 ```
 
-While any listed image name is running, the daemon blocks idle sleep/hibernation. Use `awake add` / `awake del` to edit the list comfortably; changes are picked up automatically within 30 seconds, or immediately with `awake reload`. To discard all entries and restore the initial template, run `awake reset` - it warns you and asks for a second confirmation before overwriting the file, and a running daemon reloads the configuration right away.
+`license_accepted` records the first-run agreement: any value other than `true`, a missing entry, a missing file or a damaged file makes `awake` print the license again. Sections other than `[watch]` hold `key = value` settings and are never treated as watch entries.
+
+While any listed image name is running, the daemon blocks idle sleep/hibernation. Use `awake add` / `awake del` to edit the list comfortably; changes are picked up automatically within 30 seconds, or immediately with `awake reload`. To discard all entries and restore the initial template, run `awake reset` - it warns you and asks for a second confirmation before overwriting the file, and a running daemon reloads the configuration right away (note that this also clears `license_accepted`).
 
 ## Project structure
 
@@ -101,11 +108,13 @@ While any listed image name is running, the daemon blocks idle sleep/hibernation
 awake/
 ├── utils/
 │   ├── build.bat      One-shot build script (MSVC x64 + CMake)
+│   ├── gen_license_text.py  Regenerates common/src/license.cpp from LICENSE
 │   └── pubrelease.bat Release script: tag + build + zip (needs 7-Zip)
 ├── CMakeLists.txt     Build definition (targets: awake, awake.daemon)
 ├── common/            Code shared by client and daemon
-│   ├── include/       console (colors), config (awake.ini),
-│   │                  ipc (named pipe), process (process scan)
+│   ├── include/       console (colors), config (awake.ini), ipc (named pipe),
+│   │                  license (embedded Apache-2.0 text), privilege
+│   │                  (elevation check), process (process scan), protocol
 │   └── src/
 ├── main/              Client tool: awake.exe
 └── daemon/            Background daemon: awake.daemon.exe

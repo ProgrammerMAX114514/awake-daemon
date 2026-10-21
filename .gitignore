@@ -16,6 +16,10 @@ CMakeUserPresets.json
 .vscode/
 *.user
 
+# Python bytecode cache (utils helper scripts)
+__pycache__/
+*.pyc
+
 # ZCode workspace metadata
 .zcode/
 

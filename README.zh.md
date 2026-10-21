@@ -83,17 +83,24 @@ awake del <imagename>   从监视列表删除映像名。
 - `awake 0` 和 `awake 1` 在守护进程未运行时会自动启动它。
 - 保持唤醒状态只保存在守护进程内存中，守护进程重启后回到未启用状态。
 - 守护进程启动时会向系统发送一次性的"保持唤醒"通知（把空闲计时器清零一次），与当前设置无关。
+- 首次运行会打印 Apache License 2.0 全文并询问是否同意；`help` 与 `version` 无需同意即可使用。同意结果写入 `awake.ini`，因此从旧版本升级后每个配置文件都会再询问一次。
+- 在管理员终端运行客户端（或守护进程）时会打印一行黄色警告：在这种终端启动的守护进程无法被普通权限的 shell 控制。`awake status` 会用 `(elevated)` 标记提权的守护进程。
 
 ## 配置文件
 
-`awake.ini` 与 `awake.exe` 位于同一目录（便携式）。文件不存在时会自动创建并写入说明注释。注释以 `#` 或 `;` 开头；其余每个非空行是一个映像名，例如：
+`awake.ini` 与 `awake.exe` 位于同一目录（便携式）。文件不存在时会自动创建并写入说明注释。注释以 `#` 或 `;` 开头；在 `[watch]` 节内，其余每个非空行是一个映像名，例如：
 
 ```ini
+[license]
+license_accepted = true
+
 [watch]
 notepad.exe
 ```
 
-当列表中的任何映像名正在运行时，守护进程会阻止空闲睡眠/休眠。推荐使用 `awake add` / `awake del` 编辑列表；修改会在 30 秒内自动生效，也可以用 `awake reload` 立即生效。如需清空所有条目并恢复初始模板，可运行 `awake reset`——执行前会警告并要求二次确认，覆盖文件后运行中的守护进程会立即重新加载配置。
+`license_accepted` 记录首次运行时的协议同意状态：值为 `true` 以外、条目缺失、文件不存在或文件损坏时都会再次打印协议并询问。`[watch]` 以外的节存放 `key = value` 形式的设置，绝不会被当作监视条目。
+
+当列表中的任何映像名正在运行时，守护进程会阻止空闲睡眠/休眠。推荐使用 `awake add` / `awake del` 编辑列表；修改会在 30 秒内自动生效，也可以用 `awake reload` 立即生效。如需清空所有条目并恢复初始模板，可运行 `awake reset`——执行前会警告并要求二次确认，覆盖文件后运行中的守护进程会立即重新加载配置（注意：这也会清除 `license_accepted`）。
 
 ## 项目结构
 
@@ -101,11 +108,13 @@ notepad.exe
 awake/
 ├── utils/
 │   ├── build.bat      一键构建脚本（MSVC x64 + CMake）
+│   ├── gen_license_text.py 从 LICENSE 重新生成 common/src/license.cpp
 │   └── pubrelease.bat 发布脚本：打 tag + 构建 + 打 zip 包（需要 7-Zip）
 ├── CMakeLists.txt     构建定义（目标：awake、awake.daemon）
 ├── common/            客户端与守护进程共用代码
-│   ├── include/       console（彩色输出）、config（awake.ini）、
-│   │                  ipc（命名管道）、process（进程枚举）
+│   ├── include/       console（彩色输出）、config（awake.ini）、ipc（命名管道）、
+│   │                  license（内嵌 Apache-2.0 全文）、privilege（提权检测）、
+│   │                  process（进程枚举）、protocol（wire 协议）
 │   └── src/
 ├── main/              客户端工具：awake.exe
 └── daemon/            后台守护进程：awake.daemon.exe
