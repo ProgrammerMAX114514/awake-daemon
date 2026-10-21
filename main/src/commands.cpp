@@ -33,6 +33,7 @@
 #include "config.h"
 #include "console.h"
 #include "ipc.h"
+#include "license.h"
 #include "protocol.h"
 #include "version.h"
 
@@ -72,6 +73,8 @@ void cli::PrintHelp() {
     console::PrintLine(console::kColorReset, "    'on', 'enable', 'start' = 1; 'st' = status; 'scr' = screen;");
     console::PrintLine(console::kColorReset, "    'screen 1/0' = 'screen on/off'; 'd' = daemon; 'daemon 1/start' =");
     console::PrintLine(console::kColorReset, "    'daemon on'; 'daemon 0/stop' = 'daemon off'.");
+    console::PrintLine(console::kColorReset, "  - The first run shows the Apache License 2.0 and asks for acceptance;");
+    console::PrintLine(console::kColorReset, "    the answer is stored in the [license] section of awake.ini.");
 }
 
 // -----------------------------------------------------------------------------
@@ -152,6 +155,69 @@ static bool EnsureDaemonRunning() {
 // -----------------------------------------------------------------------------
 // Command implementations
 // -----------------------------------------------------------------------------
+
+// Returns true when standard input is an interactive console. A redirected
+// or piped stdin is not, and must never block on the license question.
+static bool HasInteractiveStdin() {
+    const HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
+    if (input == NULL || input == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+    DWORD mode = 0;
+    return GetConsoleMode(input, &mode) != 0;
+}
+
+// First-run license gate: prints the embedded license and asks for consent
+// unless the configuration file already records it. Non-interactive input
+// is treated as "not accepted" so that scripts never hang.
+bool cli::EnsureLicenseAccepted() {
+    // Make sure the template exists first: the user is pointed at that file
+    // in the prompts below, and the template documents the flag.
+    if (!config::EnsureConfigExists()) {
+        console::PrintLine(console::kColorRed, "Error: cannot create the configuration file (awake.ini).");
+        return false;
+    }
+    if (config::IsLicenseAccepted()) {
+        return true;
+    }
+
+    console::PrintLine(console::kColorCyan, "awake first run - license agreement");
+    console::PrintLine(console::kColorReset, "");
+    console::Printf(console::kColorReset, "%s\n", license::kText);
+    console::PrintLine(console::kColorReset, "");
+    console::Printf(console::kColorReset, "Official license page: %s\n", license::kUrl);
+    console::PrintLine(console::kColorReset, "");
+    console::Printf(console::kColorReset,
+                    "Setting license_accepted = true in\n  %s\nmeans that you have read the license and agree to its terms.\n",
+                    config::GetConfigPath().c_str());
+
+    if (!HasInteractiveStdin()) {
+        console::PrintLine(console::kColorRed,
+                           "Error: standard input is not an interactive console, so the license cannot be accepted here.");
+        console::PrintLine(console::kColorReset,
+                           "Run awake from a console, or set 'license_accepted = true' in the [license] section of awake.ini.");
+        return false;
+    }
+
+    console::Printf(console::kColorYellow, "Do you accept the %s? [y/N]: ", license::kName);
+    std::fflush(stdout);
+
+    std::string answer;
+    if (!std::getline(std::cin, answer)) {
+        answer.clear(); // stdin closed: treat as "no"
+    }
+    const std::string normalized = config::ToLowerAscii(config::TrimText(answer));
+    if (normalized != "y" && normalized != "yes") {
+        console::PrintLine(console::kColorYellow, "License not accepted. The command was not executed.");
+        return false;
+    }
+    if (!config::SetLicenseAccepted(true)) {
+        console::PrintLine(console::kColorRed, "Error: cannot write the configuration file (awake.ini).");
+        return false;
+    }
+    console::PrintLine(console::kColorGreen, "License accepted; the choice is stored in awake.ini.");
+    return true;
+}
 
 // "awake 0" / "awake 1": forward the request to the daemon.
 int cli::CmdSetKeepAwake(bool enable) {

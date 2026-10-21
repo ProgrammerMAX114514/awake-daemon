@@ -126,8 +126,119 @@ def kill_test_app(cfg):
 
 
 # ---------------------------------------------------------------------------
+# License acceptance helpers
+# ---------------------------------------------------------------------------
+
+def config_path(cfg):
+    """Returns the path of awake.ini (it lives next to the client exe)."""
+    return os.path.join(cfg["release_dir"], "awake.ini")
+
+
+def set_license_accepted(cfg, accepted):
+    """Writes license_accepted into awake.ini, preserving all other lines.
+
+    The smoke test runs the client with a piped stdin, which the client
+    treats as non-interactive and therefore refuses to accept the license
+    on. Keeping the flag at true is what allows the other checks to run.
+    """
+    path = config_path(cfg)
+    lines = []
+    if os.path.isfile(path):
+        with open(path, "r", encoding="ascii", errors="replace") as handle:
+            lines = handle.read().splitlines()
+
+    value_line = "license_accepted = " + ("true" if accepted else "false")
+    section = ""
+    value_index = None
+    header_index = None
+    section_end = None
+    for index, raw in enumerate(lines):
+        stripped = raw.strip()
+        if stripped.startswith("["):
+            name = stripped.strip("[]").strip().lower()
+            if section == "license" and section_end is None:
+                section_end = index
+            section = name
+            if name == "license" and header_index is None:
+                header_index = index
+            continue
+        if not stripped or stripped[0] in "#;":
+            continue
+        if section == "license" and stripped.split("=")[0].strip().lower() == "license_accepted":
+            value_index = index
+            break
+
+    if value_index is not None:
+        lines[value_index] = value_line
+    elif header_index is not None:
+        insert_at = section_end if section_end is not None else len(lines)
+        lines.insert(insert_at, value_line)
+    else:
+        lines[0:0] = ["[license]", value_line, ""]
+
+    with open(path, "w", encoding="ascii", newline="\n") as handle:
+        handle.write("\n".join(lines) + "\n")
+
+
+def ensure_license_accepted(cfg):
+    """Makes sure the license gate cannot block the automated checks."""
+    if not os.path.isfile(config_path(cfg)):
+        run_client(cfg, ["status"])  # creates the template, then refuses
+    set_license_accepted(cfg, True)
+
+
+def is_license_accepted(cfg):
+    """Reports whether awake.ini currently records an accepted license."""
+    path = config_path(cfg)
+    if not os.path.isfile(path):
+        return False
+    section = ""
+    accepted = False
+    with open(path, "r", encoding="ascii", errors="replace") as handle:
+        for raw in handle:
+            stripped = raw.strip()
+            if stripped.startswith("["):
+                section = stripped.strip("[]").strip().lower()
+                continue
+            if not stripped or stripped[0] in "#;":
+                continue
+            if section != "license" or "=" not in stripped:
+                continue
+            key, value = stripped.split("=", 1)
+            if key.strip().lower() == "license_accepted":
+                accepted = value.strip().lower() == "true"
+    return accepted
+
+
+# ---------------------------------------------------------------------------
 # Test steps (each roughly maps to one user-visible behavior)
 # ---------------------------------------------------------------------------
+
+def test_license_gate(cfg):
+    """F16: the first-run license agreement gate."""
+    set_license_accepted(cfg, False)
+    code, out = run_client(cfg, ["status"])
+    check("license gate blocks commands before acceptance",
+          code != 0 and "license agreement" in out.lower(), out.strip()[-160:])
+    check("license gate prints the embedded license text",
+          "Apache License" in out and "Version 2.0" in out)
+    check("license gate links the official license page",
+          "apache.org/licenses/LICENSE-2.0" in out)
+    check("license gate refuses a non-interactive stdin",
+          "not an interactive console" in out)
+
+    code, out = run_client(cfg, ["version"])
+    check("version is exempt from the license gate",
+          code == 0 and "awake 0." in out, out.strip())
+    code, out = run_client(cfg, ["help"])
+    check("help is exempt from the license gate",
+          code == 0 and "Usage:" in out, out.strip())
+
+    set_license_accepted(cfg, True)
+    code, out = run_client(cfg, ["status"])
+    check("accepted license lets commands run",
+          code == 0 and "license agreement" not in out.lower(), out.strip()[-160:])
+
 
 def test_version_and_help(cfg):
     code, out = run_client(cfg, ["version"])
@@ -297,6 +408,11 @@ def test_reload_and_reset(cfg):
     code, out = run_client(cfg, ["reset"], stdin_text="y\n")
     check("reset proceeds on 'y'", code == 0 and "reset to its initial state" in out, out.strip())
 
+    # Reset rewrites the template, which drops the license flag: restore it
+    # so the remaining checks are not blocked by the gate.
+    check("reset clears the license acceptance", not is_license_accepted(cfg))
+    ensure_license_accepted(cfg)
+
     code, out = run_client(cfg, ["st"])
     check("watch list is empty after reset", "(empty" in out)
 
@@ -372,8 +488,10 @@ def main():
 
     # Save and clear the environment the tests are about to touch.
     autostart_before = autostart_value_exists(cfg)
+    ensure_license_accepted(cfg)
     run_client(cfg, ["daemon", "off"])  # start from a stopped daemon
 
+    test_license_gate(cfg)
     test_version_and_help(cfg)
     test_status_without_daemon(cfg)
     test_daemon_lifecycle(cfg)
@@ -406,6 +524,14 @@ def main():
     print("     the daemon process is running afterwards ('awake status').")
     print("  4. Manual sleep (power button / Start menu) still works while keep-awake")
     print("     is enabled - idle sleep is blocked, manual sleep is not.")
+    print("  5. Elevation warning: run 'awake status' from an ELEVATED terminal and")
+    print("     confirm the yellow one-line warning appears (and that the command")
+    print("     still runs). 'awake status' shows 'running (elevated)' for an")
+    print("     elevated daemon.")
+    print("  6. License prompt: delete the [license] section from awake.ini, run")
+    print("     'awake status' in a normal console, confirm the license text and the")
+    print("     [y/N] question; answer 'y' and check that license_accepted = true")
+    print("     is written and that the next run does not ask again.")
 
     return 1 if FAIL else 0
 

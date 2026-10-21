@@ -78,6 +78,16 @@ int main(int argc, char** argv) {
 
     const std::string command = argv[1];
 
+    // First-run license gate. "help" and "version" stay available without
+    // accepting the license, so a new user can read the version and the
+    // usage before deciding; every other command requires the acceptance.
+    const bool helpOrVersion = (command == "version" || command == "help" ||
+                                command == "?" || command == "h" ||
+                                command == "/?" || command == "-h" || command == "--help");
+    if (!helpOrVersion && !cli::EnsureLicenseAccepted()) {
+        return 1;
+    }
+
     if (command == "version") {
         console::Printf(console::kColorCyan, "awake %s\n", version::kVersion);
         return 0;

@@ -39,6 +39,13 @@ bool CheckDaemonVersion(const std::string& daemonVersion);
 // without arguments and as a hint after unknown commands.
 void PrintHelp();
 
+// First-run license gate. When the configuration file does not record an
+// accepted license, the full Apache License 2.0 text is printed, the user
+// is asked for confirmation and the answer is stored in awake.ini.
+// Returns false when the user declined or when standard input is not an
+// interactive console (the caller then aborts with a non-zero exit code).
+bool EnsureLicenseAccepted();
+
 // "awake 0" / "awake 1": disable/enable keep-awake via the daemon.
 // Returns the process exit code.
 int CmdSetKeepAwake(bool enable);
