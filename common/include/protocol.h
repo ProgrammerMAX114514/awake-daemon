@@ -76,6 +76,7 @@ struct DaemonStatus {
     bool app = false;     // a watched application is currently running
     bool screen = false;  // screen keep-awake set with "awake screen on"
     bool active = false;  // anything currently prevents idle sleep
+    bool elevated = false; // daemon runs with an elevated token (new in 0.4.x)
     std::string version;  // daemon version (empty for older daemons)
 };
 
@@ -87,6 +88,11 @@ std::string SerializeStatus(const DaemonStatus& status);
 // that are missing from the response stay false; the return value reports
 // whether the response started with "OK" at all.
 bool ParseStatusResponse(const std::string& response, DaemonStatus& status);
+
+// The GET_STATUS response always carries an ELEVATED=0|1 line from daemons
+// that know about it. Older daemons omit the line, so the client uses
+// HasElevationInfo() to distinguish "not elevated" from "unknown".
+bool HasElevationInfo(const std::string& response);
 
 } // namespace protocol
 

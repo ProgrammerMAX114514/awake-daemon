@@ -50,10 +50,14 @@ add_library(awake_common STATIC
     common/src/console.cpp
     common/src/config.cpp
     common/src/ipc.cpp
+    common/src/privilege.cpp
     common/src/process.cpp
     common/src/protocol.cpp
 )
 target_include_directories(awake_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/common/include)
+# advapi32 provides GetTokenInformation (elevation check); the registry
+# functions used by the autostart code live in the same library.
+target_link_libraries(awake_common PUBLIC advapi32)
 
 # -----------------------------------------------------------------------------
 # Client: awake.exe

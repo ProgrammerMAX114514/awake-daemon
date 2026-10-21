@@ -52,6 +52,7 @@ std::string SerializeStatus(const DaemonStatus& status) {
     response += "APP=" + std::string(status.app ? "1" : "0") + "\n";
     response += "SCREEN=" + std::string(status.screen ? "1" : "0") + "\n";
     response += "ACTIVE=" + std::string(status.active ? "1" : "0") + "\n";
+    response += "ELEVATED=" + std::string(status.elevated ? "1" : "0") + "\n";
     response += "VERSION=" + status.version + "\n";
     return response;
 }
@@ -77,6 +78,8 @@ bool ParseStatusResponse(const std::string& response, DaemonStatus& status) {
             status.screen = (line.compare(7, 1, "1") == 0);
         } else if (line.compare(0, 7, "ACTIVE=") == 0) {
             status.active = (line.compare(7, 1, "1") == 0);
+        } else if (line.compare(0, 9, "ELEVATED=") == 0) {
+            status.elevated = (line.compare(9, 1, "1") == 0);
         } else if (line.compare(0, 8, "VERSION=") == 0) {
             status.version = line.substr(8);
         }
@@ -86,6 +89,24 @@ bool ParseStatusResponse(const std::string& response, DaemonStatus& status) {
         lineStart = lineEnd + 1;
     }
     return ok;
+}
+
+bool HasElevationInfo(const std::string& response) {
+    size_t lineStart = 0;
+    while (lineStart <= response.size()) {
+        size_t lineEnd = response.find('\n', lineStart);
+        if (lineEnd == std::string::npos) {
+            lineEnd = response.size();
+        }
+        if (response.compare(lineStart, 9, "ELEVATED=") == 0) {
+            return true;
+        }
+        if (lineEnd == response.size()) {
+            break;
+        }
+        lineStart = lineEnd + 1;
+    }
+    return false;
 }
 
 bool ParsePongResponse(const std::string& response, std::string& daemonVersion) {

@@ -53,21 +53,30 @@ static bool QueryDaemonStatus(protocol::DaemonStatus& info) {
 }
 
 int cli::CmdStatus() {
-    console::Printf(console::kColorReset, "Daemon:     ");
+    protocol::DaemonStatus info;
     const bool running = ipc::IsDaemonRunning();
-    if (running) {
-        console::PrintLine(console::kColorGreen, "running");
-    } else {
+
+    console::Printf(console::kColorReset, "Daemon:     ");
+    if (!running) {
         console::PrintLine(console::kColorRed, "not running");
+    } else {
+        // The status response is needed before the line can be completed,
+        // because an elevated daemon is flagged in the same line.
+        console::Printf(console::kColorGreen, "running");
+        if (!QueryDaemonStatus(info)) {
+            console::Printf(console::kColorReset, "\n");
+            console::PrintLine(console::kColorRed, "Error: lost contact with the daemon.");
+            return 1;
+        }
+        if (info.elevated) {
+            // Explain why a non-elevated shell may be unable to control it.
+            console::Printf(console::kColorYellow, " (elevated)");
+        }
+        console::Printf(console::kColorReset, "\n");
     }
 
     // Keep-awake and screen states are authoritative only while the daemon
     // runs; without it they are inactive by definition.
-    protocol::DaemonStatus info;
-    if (running && !QueryDaemonStatus(info)) {
-        console::PrintLine(console::kColorRed, "Error: lost contact with the daemon.");
-        return 1;
-    }
     cli::CheckDaemonVersion(info.version);
 
     if (!info.manual && !info.app) {

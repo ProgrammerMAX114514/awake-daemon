@@ -30,6 +30,7 @@
 
 #include "config.h"
 #include "ipc.h"
+#include "privilege.h"
 #include "process.h"
 #include "protocol.h"
 #include "state.h"
@@ -47,6 +48,7 @@ std::string HandleGetStatus() {
     status.app = daemonstate::GetAppActive();
     status.screen = daemonstate::GetScreen();
     status.active = (status.manual || status.app || status.screen);
+    status.elevated = privilege::IsProcessElevated();
     status.version = version::kVersion;
     return protocol::SerializeStatus(status);
 }

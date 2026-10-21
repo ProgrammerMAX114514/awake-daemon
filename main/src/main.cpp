@@ -51,6 +51,7 @@
 
 #include "commands.h"
 #include "console.h"
+#include "privilege.h"
 #include "version.h"
 
 // -----------------------------------------------------------------------------
@@ -59,6 +60,15 @@
 
 int main(int argc, char** argv) {
     console::EnableColors();
+
+    // Warn when the client itself runs with administrator rights. A daemon
+    // started from such a console cannot be stopped or contacted from a
+    // non-elevated shell, which looks like "the process runs but does not
+    // respond". The warning is informational: it never blocks the command.
+    if (privilege::IsProcessElevated()) {
+        console::PrintLine(console::kColorYellow,
+                           "Warning: awake is running elevated; a daemon started from here cannot be controlled by a non-elevated shell.");
+    }
 
     // No arguments behaves like "help".
     if (argc < 2) {

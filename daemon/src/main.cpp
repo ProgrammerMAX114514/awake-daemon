@@ -39,12 +39,22 @@
 #include "console.h"
 #include "ipc.h"
 #include "power.h"
+#include "privilege.h"
 #include "server.h"
 #include "state.h"
 #include "version.h"
 
 int main(int argc, char** argv) {
     console::EnableColors();
+
+    // Warn when the daemon was started with administrator rights: such a
+    // daemon cannot be stopped or contacted from a non-elevated shell, which
+    // looks like "the process runs but does not respond". The warning is
+    // informational only and never blocks the daemon.
+    if (privilege::IsProcessElevated()) {
+        console::PrintLine(console::kColorYellow,
+                           "Warning: awake.daemon.exe is running elevated; a non-elevated shell cannot control it.");
+    }
 
     // Refuse to run when not launched by the client with the secret token.
     // This is what makes the daemon "not callable from the command line".
