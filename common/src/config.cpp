@@ -24,12 +24,32 @@
 
 #include <windows.h>
 #include <cctype>
+#include <cstddef>
 #include <fstream>
 #include <set>
 
 namespace config {
 
 namespace {
+
+// The [license] section, including the explanatory comments that are
+// written into a fresh configuration file and added to older files when the
+// acceptance flag is stored for the first time. The value line follows the
+// header and is appended separately (see BuildLicenseSection).
+const char kLicenseSectionHead[] =
+    "# ===========================================================\n"
+    "# License acceptance\n"
+    "# ===========================================================\n"
+    "# awake is released under the Apache License 2.0. The official\n"
+    "# license page, including the full text, is:\n"
+    "#     https://www.apache.org/licenses/LICENSE-2.0\n"
+    "#\n"
+    "# Setting license_accepted to true means that you have read the\n"
+    "# license and agree to its terms.\n"
+    "# Any other value, a missing entry or a missing file makes awake\n"
+    "# print the license and ask again before running a command.\n"
+    "#\n"
+    "[license]\n";
 
 // The comment header that is written into a freshly created configuration
 // file. It documents the format and the effect of the watch list.
@@ -47,15 +67,57 @@ const char kDefaultConfig[] =
     "# Syntax:\n"
     "#   - Lines starting with '#' or ';' are comments.\n"
     "#   - Empty lines are ignored.\n"
-    "#   - Section headers such as [watch] are ignored.\n"
-    "#   - Every other non-empty line is ONE image name, for\n"
-    "#     example:\n"
+    "#   - Section headers such as [watch] and [license] select the\n"
+    "#     section that the following lines belong to.\n"
+    "#   - Inside [watch], every non-empty line is ONE image name,\n"
+    "#     for example:\n"
     "#       notepad.exe\n"
     "#     Only the file name part is compared and the comparison\n"
     "#     is case-insensitive. Use 'awake add <imagename>' and\n"
     "#     'awake del <imagename>' to edit this list comfortably.\n"
+    "#   - Sections other than [watch] hold 'key = value' settings;\n"
+    "#     their lines are never treated as watch entries.\n"
     "#\n"
+    "# ===========================================================\n"
+    "# License acceptance\n"
+    "# ===========================================================\n"
+    "# awake is released under the Apache License 2.0. The official\n"
+    "# license page, including the full text, is:\n"
+    "#     https://www.apache.org/licenses/LICENSE-2.0\n"
+    "#\n"
+    "# Setting license_accepted to true means that you have read the\n"
+    "# license and agree to its terms.\n"
+    "# Any other value, a missing entry or a missing file makes awake\n"
+    "# print the license and ask again before running a command.\n"
+    "#\n"
+    "[license]\n"
+    "license_accepted = false\n"
+    "\n"
     "[watch]\n";
+
+// The value line written by SetLicenseAccepted().
+std::string LicenseValueLine(bool accepted) {
+    return std::string(kLicenseKey) + " = " + (accepted ? "true" : "false");
+}
+
+// Splits a multi-line template constant into individual lines, dropping the
+// trailing empty entry that comes from the final newline.
+std::vector<std::string> SplitTemplate(const char* text) {
+    std::vector<std::string> lines;
+    std::string current;
+    for (const char* p = text; *p != '\0'; ++p) {
+        if (*p == '\n') {
+            lines.push_back(current);
+            current.clear();
+        } else {
+            current.push_back(*p);
+        }
+    }
+    if (!current.empty()) {
+        lines.push_back(current);
+    }
+    return lines;
+}
 
 // Removes leading and trailing blanks (spaces, tabs and carriage returns
 // that linger from CRLF line endings read line by line).
@@ -71,17 +133,68 @@ std::string Trim(const std::string& text) {
     return text.substr(begin, end - begin);
 }
 
-// Returns true when a raw line from the configuration file carries a watch
-// entry (i.e. it is not blank, not a comment and not a section header).
-bool IsEntryLine(const std::string& line) {
-    if (line.empty()) {
+// Returns true for blank lines and comment lines.
+bool IsCommentOrBlank(const std::string& trimmed) {
+    if (trimmed.empty()) {
+        return true;
+    }
+    return trimmed[0] == '#' || trimmed[0] == ';';
+}
+
+// Returns true when the trimmed line is a "[name]" section header.
+bool IsSectionHeader(const std::string& trimmed) {
+    return !trimmed.empty() && trimmed[0] == '[';
+}
+
+// Returns the lower-cased name of a section header, or an empty string when
+// the line is not a well formed header.
+std::string SectionName(const std::string& trimmed) {
+    if (!IsSectionHeader(trimmed)) {
+        return std::string();
+    }
+    const size_t close = trimmed.find(']');
+    if (close == std::string::npos || close < 2) {
+        return std::string();
+    }
+    return ToLowerAscii(Trim(trimmed.substr(1, close - 1)));
+}
+
+// Returns true when lines belong to the watch list: either inside the
+// [watch] section or before the first section header (files written by
+// versions that had no sections at all).
+bool IsWatchSection(const std::string& section) {
+    return section.empty() || section == "watch";
+}
+
+// Reads the key of a "key = value" line (lower-cased), or an empty string
+// when the line carries no '=' sign.
+std::string KeyOf(const std::string& trimmed) {
+    const size_t equals = trimmed.find('=');
+    if (equals == std::string::npos) {
+        return std::string();
+    }
+    return ToLowerAscii(Trim(trimmed.substr(0, equals)));
+}
+
+// Reads the (trimmed, lower-cased) value of a "key = value" line.
+std::string ValueOf(const std::string& trimmed) {
+    const size_t equals = trimmed.find('=');
+    if (equals == std::string::npos) {
+        return std::string();
+    }
+    return ToLowerAscii(Trim(trimmed.substr(equals + 1)));
+}
+
+// Reads every line of the configuration file. Returns false when the file
+// cannot be opened.
+bool ReadAllLines(const std::string& path, std::vector<std::string>& lines) {
+    std::ifstream file(path.c_str(), std::ios::binary);
+    if (!file.is_open()) {
         return false;
     }
-    if (line[0] == '#' || line[0] == ';') {
-        return false; // comment line
-    }
-    if (line[0] == '[') {
-        return false; // section header
+    std::string line;
+    while (std::getline(file, line)) {
+        lines.push_back(line);
     }
     return true;
 }
@@ -152,12 +265,21 @@ std::vector<std::string> ReadWatchList() {
     if (!file.is_open()) {
         return entries; // no file, no entries
     }
+    std::string section;
     std::string line;
     while (std::getline(file, line)) {
         const std::string trimmed = Trim(line);
-        if (IsEntryLine(trimmed)) {
-            entries.push_back(trimmed);
+        if (IsCommentOrBlank(trimmed)) {
+            continue;
         }
+        if (IsSectionHeader(trimmed)) {
+            section = SectionName(trimmed);
+            continue;
+        }
+        if (!IsWatchSection(section)) {
+            continue; // settings of another section (e.g. [license])
+        }
+        entries.push_back(trimmed);
     }
     return entries;
 }
@@ -174,21 +296,37 @@ bool AddWatchEntry(const std::string& imageName) {
     // Read the whole file so that comments are preserved and duplicates
     // (case-insensitive) can be detected.
     std::vector<std::string> lines;
-    {
-        std::ifstream file(path.c_str(), std::ios::binary);
-        if (!file.is_open()) {
-            return false;
+    if (!ReadAllLines(path, lines)) {
+        return false;
+    }
+
+    // The new entry must land inside the watch section: when the file ends
+    // in another section (for example a hand edited [license] block), add a
+    // [watch] header first so that the entry is not read as a setting.
+    std::string section;
+    for (size_t i = 0; i < lines.size(); ++i) {
+        const std::string trimmed = Trim(lines[i]);
+        if (IsSectionHeader(trimmed)) {
+            section = SectionName(trimmed);
         }
-        std::string line;
-        while (std::getline(file, line)) {
-            lines.push_back(line);
-        }
+    }
+    if (!IsWatchSection(section)) {
+        lines.push_back("[watch]");
+        section = "watch";
     }
 
     const std::string lowered = ToLowerAscii(imageName);
+    section.clear();
     for (size_t i = 0; i < lines.size(); ++i) {
         const std::string trimmed = Trim(lines[i]);
-        if (IsEntryLine(trimmed) && ToLowerAscii(trimmed) == lowered) {
+        if (IsCommentOrBlank(trimmed)) {
+            continue;
+        }
+        if (IsSectionHeader(trimmed)) {
+            section = SectionName(trimmed);
+            continue;
+        }
+        if (IsWatchSection(section) && ToLowerAscii(trimmed) == lowered) {
             return false; // already present
         }
     }
@@ -203,23 +341,26 @@ bool RemoveWatchEntry(const std::string& imageName) {
     const std::string path = GetConfigPath();
 
     std::vector<std::string> lines;
-    {
-        std::ifstream file(path.c_str(), std::ios::binary);
-        if (!file.is_open()) {
-            return false;
-        }
-        std::string line;
-        while (std::getline(file, line)) {
-            lines.push_back(line);
-        }
+    if (!ReadAllLines(path, lines)) {
+        return false;
     }
 
     const std::string lowered = ToLowerAscii(imageName);
+    std::string section;
     std::vector<std::string> kept;
     bool removed = false;
     for (size_t i = 0; i < lines.size(); ++i) {
         const std::string trimmed = Trim(lines[i]);
-        if (!removed && IsEntryLine(trimmed) && ToLowerAscii(trimmed) == lowered) {
+        if (IsSectionHeader(trimmed)) {
+            section = SectionName(trimmed);
+            kept.push_back(lines[i]);
+            continue;
+        }
+        if (IsCommentOrBlank(trimmed)) {
+            kept.push_back(lines[i]);
+            continue;
+        }
+        if (!removed && IsWatchSection(section) && ToLowerAscii(trimmed) == lowered) {
             removed = true; // drop this line, keep everything else
             continue;
         }
@@ -256,6 +397,98 @@ std::string ToLowerAscii(const std::string& text) {
         result[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(result[i])));
     }
     return result;
+}
+
+const char* const kLicenseKey = "license_accepted";
+
+bool IsLicenseAccepted() {
+    std::vector<std::string> lines;
+    if (!ReadAllLines(GetConfigPath(), lines)) {
+        return false; // missing or unreadable file: treat as a first run
+    }
+    std::string section;
+    bool found = false;
+    bool accepted = false;
+    for (size_t i = 0; i < lines.size(); ++i) {
+        const std::string trimmed = Trim(lines[i]);
+        if (IsCommentOrBlank(trimmed)) {
+            continue;
+        }
+        if (IsSectionHeader(trimmed)) {
+            section = SectionName(trimmed);
+            continue;
+        }
+        if (section != "license" || KeyOf(trimmed) != kLicenseKey) {
+            continue;
+        }
+        found = true;
+        accepted = (ValueOf(trimmed) == "true");
+    }
+    // A missing key, the value false and any other value all mean "not
+    // accepted yet".
+    return found && accepted;
+}
+
+bool SetLicenseAccepted(bool accepted) {
+    if (!EnsureConfigExists()) {
+        return false;
+    }
+    const std::string path = GetConfigPath();
+    std::vector<std::string> lines;
+    if (!ReadAllLines(path, lines)) {
+        return false;
+    }
+
+    const std::string valueLine = LicenseValueLine(accepted);
+
+    std::string section;
+    size_t headerIndex = std::string::npos;  // line of the "[license]" header
+    size_t valueIndex = std::string::npos;   // line of the "license_accepted" key
+    size_t sectionEnd = std::string::npos;   // first line after the section
+    for (size_t i = 0; i < lines.size(); ++i) {
+        const std::string trimmed = Trim(lines[i]);
+        if (IsSectionHeader(trimmed)) {
+            if (section == "license" && sectionEnd == std::string::npos) {
+                sectionEnd = i;
+            }
+            section = SectionName(trimmed);
+            if (section == "license" && headerIndex == std::string::npos) {
+                headerIndex = i;
+            }
+            continue;
+        }
+        if (IsCommentOrBlank(trimmed)) {
+            continue;
+        }
+        if (section == "license" && KeyOf(trimmed) == kLicenseKey &&
+            valueIndex == std::string::npos) {
+            valueIndex = i;
+        }
+    }
+
+    if (valueIndex != std::string::npos) {
+        lines[valueIndex] = valueLine; // update in place, keep the comments
+    } else if (headerIndex != std::string::npos) {
+        const size_t insertAt = (sectionEnd != std::string::npos) ? sectionEnd : lines.size();
+        lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(insertAt), valueLine);
+    } else {
+        // No section yet (a file written by an older version): insert the
+        // whole block before the first section header so that the watch list
+        // keeps growing at the end of the file.
+        size_t insertAt = lines.size();
+        for (size_t i = 0; i < lines.size(); ++i) {
+            if (IsSectionHeader(Trim(lines[i]))) {
+                insertAt = i;
+                break;
+            }
+        }
+        std::vector<std::string> block = SplitTemplate(kLicenseSectionHead);
+        block.push_back(valueLine);
+        block.push_back(std::string());
+        lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(insertAt),
+                     block.begin(), block.end());
+    }
+    return WriteAllLines(path, lines);
 }
 
 } // namespace config

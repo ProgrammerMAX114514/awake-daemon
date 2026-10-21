@@ -25,9 +25,13 @@
 //
 //   - Lines starting with '#' or ';' are comments and are ignored.
 //   - Empty lines are ignored.
-//   - Section headers such as [watch] are ignored (kept for readability).
-//   - Every other non-empty line holds one image name (for example
-//     "notepad.exe") that the daemon watches.
+//   - Section headers such as [watch] or [license] select the section that
+//     the following lines belong to.
+//   - Inside [watch] (and before any section header, for old files that
+//     have no headers at all) every non-empty line holds one image name
+//     (for example "notepad.exe") that the daemon watches.
+//   - Inside any other section the lines are "key = value" settings; the
+//     [license] section holds "license_accepted".
 //
 // When the file does not exist it is created automatically with a comment
 // header explaining the format.
@@ -59,7 +63,8 @@ bool EnsureConfigExists();
 bool ResetConfig();
 
 // Reads the watch list (the image names currently configured).
-// Comment lines, empty lines and section headers are skipped.
+// Comment lines, empty lines, section headers and the settings of other
+// sections (for example [license]) are skipped.
 std::vector<std::string> ReadWatchList();
 
 // Appends one image name to the watch list. The entry is validated with
@@ -83,6 +88,25 @@ std::string ToLowerAscii(const std::string& text);
 // Removes leading and trailing blanks (spaces, tabs, carriage returns and
 // line feeds) from text. Used for configuration lines and user input.
 std::string TrimText(const std::string& text);
+
+// -----------------------------------------------------------------------------
+// License acceptance
+// -----------------------------------------------------------------------------
+
+// The key that records the license acceptance inside the [license] section.
+extern const char* const kLicenseKey;
+
+// Returns true only when the configuration file contains a [license]
+// section with "license_accepted = true". A missing file, an unreadable or
+// damaged file, a missing key, the value false and any non-"true" value all
+// return false, which makes the client treat the run as a first run.
+bool IsLicenseAccepted();
+
+// Writes the acceptance flag while preserving every other line (comments
+// included). The [license] section and its explanatory comments are added
+// when they are missing (for example in files created by older versions).
+// Returns false when the file cannot be written.
+bool SetLicenseAccepted(bool accepted);
 
 } // namespace config
 

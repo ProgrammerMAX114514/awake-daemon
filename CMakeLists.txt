@@ -50,6 +50,7 @@ add_library(awake_common STATIC
     common/src/console.cpp
     common/src/config.cpp
     common/src/ipc.cpp
+    common/src/license.cpp
     common/src/privilege.cpp
     common/src/process.cpp
     common/src/protocol.cpp
