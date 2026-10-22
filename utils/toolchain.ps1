@@ -162,7 +162,12 @@ function Save-ToolSetting {
         if ($keyIndex -ge 0) {
             $lines[$keyIndex] = "$Key = $Value"
         } else {
-            $lines = @($lines[0..($insertAt - 1)]) + @("$Key = $Value") + @($lines[$insertAt..($lines.Count - 1)])
+            # Insert the key at the end of the section. Note the explicit
+            # empty-slice handling: a descending range such as $lines[5..4]
+            # would repeat lines instead of producing nothing.
+            $head = if ($insertAt -gt 0) { @($lines[0..($insertAt - 1)]) } else { @() }
+            $tail = if ($insertAt -lt $lines.Count) { @($lines[$insertAt..($lines.Count - 1)]) } else { @() }
+            $lines = @($head) + @("$Key = $Value") + @($tail)
         }
     }
 
@@ -234,6 +239,12 @@ function Find-Tool {
     $configured = Get-ToolSetting -Section $Section -Key $Key
     if ($configured) {
         if (Test-Executable $configured) { return $configured }
+        # A bare name (no path separator) is looked up on PATH, so entries like
+        # "git" or "cmake" keep working.
+        if ($configured -notmatch '[\\/]') {
+            $named = Get-Command $configured -ErrorAction SilentlyContinue
+            if ($named) { return $named.Source }
+        }
         Write-Host "[toolchain] WARNING: '$Section.$Key' points to '$configured', which does not exist. Falling back to detection."
     }
 
