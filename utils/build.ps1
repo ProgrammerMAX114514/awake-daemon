@@ -18,45 +18,63 @@
 # =============================================================================
 # build.ps1 - configure and build awake in Release configuration.
 #
-# Invoked by utils\build.bat (which is only a launcher for pwsh). The
-# executables always end up in build\Release\, no matter which CMake
-# generator was used:
+# Invoked by utils\build.bat (which is only a launcher for PowerShell 7).
+# Toolchain paths come from utils\toolchain.ps1 (configuration files first,
+# detection second, an interactive question as the last resort).
 #
-#   1. "Visual Studio 18 2026" - the normal path, also writes IDE files.
-#   2. "NMake Makefiles" into build\nmake - used when the Visual Studio
-#      generator cannot run (for example when MSBuild is blocked by a
-#      security policy).
+# The executables always end up in build\Release\, no matter which CMake
+# generator was used:
+#   1. the configured generator, or the Visual Studio generator matching the
+#      installed Visual Studio;
+#   2. "NMake Makefiles" into build\nmake when that generator cannot run
+#      (for example when MSBuild is blocked by a security policy).
 # =============================================================================
 
 param(
-    [string]$BuildDir = '',
-    [switch]$NoFallback
+    [switch]$NoFallback,
+    [switch]$NonInteractive
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 
+if ($NonInteractive) { $env:CI = '1' }
+
 Write-Host '[build] Setting up the MSVC x64 environment...'
 . (Join-Path $PSScriptRoot 'msvc-env.ps1')
 
-$cmake = 'F:\Program Files\CMake\bin\cmake.exe'
-if (-not (Test-Path $cmake)) { $cmake = 'cmake' }
+$cmake = Get-CMakeCommand
+$vsRoot = Get-VisualStudioRoot
+$generator = Get-CMakeGenerator -VisualStudioRoot $vsRoot
+$platform = Get-ToolSetting -Section 'generator' -Key 'platform'
+if (-not $platform) { $platform = 'x64' }
+
+Write-Host "[build] CMake    : $cmake"
+Write-Host "[build] Generator: $generator"
 
 Push-Location $root
 try {
-    $vsFailed = $false
+    $useNMake = $false
 
-    Write-Host '[build] Configuring with CMake (Visual Studio generator)...'
-    & $cmake -S . -B build -G 'Visual Studio 18 2026' -A x64
-    if ($LASTEXITCODE -ne 0) {
-        $vsFailed = $true
-        if ($NoFallback) {
-            throw 'CMake configuration failed with the Visual Studio generator.'
+    if ($generator -eq 'NMake Makefiles') {
+        $useNMake = $true
+    } else {
+        Write-Host '[build] Configuring with CMake...'
+        & $cmake -S . -B build -G $generator -A $platform
+        if ($LASTEXITCODE -ne 0) {
+            if ($NoFallback) {
+                throw "CMake configuration failed with the '$generator' generator."
+            }
+            Write-Host '[build] That generator is unavailable, falling back to NMake...'
+            $useNMake = $true
         }
-        Write-Host '[build] Visual Studio generator unavailable, falling back to NMake...'
+    }
+
+    if ($useNMake) {
         if (Test-Path 'build\nmake\CMakeCache.txt') {
             Remove-Item -Recurse -Force 'build\nmake'
         }
+        Write-Host '[build] Configuring with CMake (NMake)...'
         & $cmake -S . -B build\nmake -G 'NMake Makefiles' -DCMAKE_BUILD_TYPE=Release
         if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed.' }
 

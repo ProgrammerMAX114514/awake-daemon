@@ -18,7 +18,7 @@
 # =============================================================================
 # pubrelease.ps1 - build, tag and package a release.
 #
-# Invoked by utils\pubrelease.bat (a launcher for pwsh) or directly:
+# Invoked by utils\pubrelease.bat (a launcher for PowerShell 7) or directly:
 #
 #   utils\pubrelease.bat 0.6.0-beta
 #
@@ -26,31 +26,32 @@
 # executables plus LICENSE and NOTICE into
 # build\Release\publish\tag-<tag>\awake-daemon.win64.zip.
 # The tag is NOT pushed - push it with: git push origin <tag>
+# Toolchain paths come from utils\toolchain.ps1.
 # =============================================================================
 
 param(
     [Parameter(Position = 0)]
-    [string]$Tag = ''
+    [string]$Tag = '',
+    [switch]$NonInteractive
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
+
+if ($NonInteractive) { $env:CI = '1' }
+
+. (Join-Path $PSScriptRoot 'toolchain.ps1')
 
 if ([string]::IsNullOrWhiteSpace($Tag)) {
     Write-Host '[pubrelease] ERROR: missing tag argument. Usage: utils\pubrelease.bat <tag>'
     exit 1
 }
 
-$sevenZip = 'C:\Program Files\7-Zip\7z.exe'
-if (-not (Test-Path $sevenZip)) {
-    Write-Host "[pubrelease] ERROR: 7-Zip not found at '$sevenZip'."
-    exit 1
-}
+$sevenZip = Get-SevenZipPath
+$git = Get-GitCommand
 
-# Prefer the system Git installation (see the project notes: the bundled
-# PortableGit can hang while signing).
-$git = Join-Path $env:ProgramFiles 'Git\bin\git.exe'
-if (-not (Test-Path $git)) { $git = 'git' }
+Write-Host "[pubrelease] 7-Zip: $sevenZip"
+Write-Host "[pubrelease] Git  : $git"
 
 Push-Location $root
 try {

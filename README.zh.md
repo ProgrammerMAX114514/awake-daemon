@@ -48,6 +48,29 @@ build\Release\awake.daemon.exe
 
 `utils\msvc-env.ps1` 优先调用 `vcvarsall.bat`；当它无法给出完整环境时（例如 `reg.exe` 被安全策略拦截），改为手工拼装 `INCLUDE`/`LIB`/`PATH`。
 
+### 工具链配置（可选）
+
+默认无需任何配置——所有路径都会自动探测。若要固定某个工具链，把 `utils\toolchain.ini.example` 复制为 `utils\toolchain.ini`（本地文件，不进 git）或 `%APPDATA%\awake\toolchain.ini`（所有 checkout 共用），按需取消注释：
+
+```ini
+[visual-studio]
+path = C:\Program Files\Microsoft Visual Studio\18\Community
+
+[windows-sdk]
+root = C:\Program Files (x86)\Windows Kits\10
+
+[cmake]
+path = C:\Program Files\CMake\bin\cmake.exe
+
+[generator]
+name = Visual Studio 18 2026
+
+[sevenzip]
+path = C:\Program Files\7-Zip\7z.exe
+```
+
+优先级：环境变量 `AWAKE_TOOLCHAIN`（指向配置文件）> `utils\toolchain.ini` > `%APPDATA%\awake\toolchain.ini` > 自动探测。探测不到某个工具时，构建会询问一次路径并写回配置文件；非交互场景则直接报错并给出需要添加的配置项。全部可用条目见 `toolchain.ini.example` 内的注释。
+
 ## 测试
 
 `utils/test/` 中提供了半自动化冒烟测试：
@@ -113,6 +136,8 @@ awake/
 │   ├── build.bat      启动器：用 PowerShell 7 运行 build.ps1
 │   ├── build.ps1      CMake 配置 + Release 构建（VS 生成器，失败回退 NMake）
 │   ├── msvc-env.ps1   MSVC/SDK 环境准备（vcvarsall 或手工回退）
+│   ├── toolchain.ps1  工具链配置读取、探测与交互式补录
+│   ├── toolchain.ini.example  模板：可固定 VS/SDK/CMake/7z/Git 路径
 │   ├── gen_license_text.py 从 LICENSE 重新生成 common/src/license.cpp
 │   └── pubrelease.bat pubrelease.ps1 的启动器（打 tag + 构建 + 打包，需要 7-Zip）
 ├── CMakeLists.txt     构建定义（目标：awake、awake.daemon）

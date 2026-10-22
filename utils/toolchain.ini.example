@@ -1,0 +1,61 @@
+# =============================================================================
+# toolchain.ini.example - template for the awake build toolchain settings
+#
+# Copy this file to toolchain.ini (same folder, not committed) or to
+# %APPDATA%\awake\toolchain.ini (shared by every checkout) and uncomment the
+# entries you want to pin. Every entry is optional: a missing entry is
+# detected automatically, and when detection fails the build asks for the
+# path once and writes the answer back into the configuration file.
+#
+# Priority (highest first):
+#   1. the file named by the AWAKE_TOOLCHAIN environment variable
+#   2. <repository>\utils\toolchain.ini
+#   3. %APPDATA%\awake\toolchain.ini
+#   4. automatic detection
+#
+# Relative paths are resolved against the repository root.
+# =============================================================================
+
+[visual-studio]
+# Folder that contains VC\Auxiliary\Build\vcvarsall.bat.
+# path = C:\Program Files\Microsoft Visual Studio\18\Community
+
+[msvc]
+# Toolset version inside <visual-studio>\VC\Tools\MSVC.
+# Default: the newest installed toolset.
+# version = 14.51.36231
+
+[windows-sdk]
+# Windows Kits root (the folder that contains Include and Lib).
+# root = C:\Program Files (x86)\Windows Kits\10
+# SDK version inside <root>\Include. Default: the newest installed one.
+# version = 10.0.26100.0
+
+[cmake]
+# cmake.exe. Default: cmake from PATH, then the usual install folders.
+# path = C:\Program Files\CMake\bin\cmake.exe
+
+[generator]
+# CMake generator. Default: the Visual Studio generator matching the
+# installed Visual Studio (Visual Studio 18 2026 for VS 18, ...); when the
+# version is unknown the build uses NMake. The build falls back to NMake
+# automatically when the configured generator cannot run.
+# name = Visual Studio 18 2026
+# Architecture passed to the Visual Studio generator. Default: x64.
+# platform = x64
+
+[sevenzip]
+# 7z.exe, used by utils\pubrelease.bat. Default: 7z from PATH, then the
+# usual install folders.
+# path = C:\Program Files\7-Zip\7z.exe
+
+[git]
+# git.exe, used for the signed tag. Default: git from PATH, then the usual
+# install folders. Prefer the regular Git installation over portable builds:
+# signing is more reliable with a single gpg-agent.
+# path = C:\Program Files\Git\bin\git.exe
+
+[powershell]
+# pwsh.exe. The .bat launchers look at PATH, AWAKE_PWSH and the usual install
+# folders; the PowerShell scripts use this entry as well.
+# path = C:\Program Files\PowerShell\7\pwsh.exe

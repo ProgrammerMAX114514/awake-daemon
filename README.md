@@ -48,6 +48,29 @@ Both executables statically link the C runtime and have no runtime dependencies 
 
 `utils\msvc-env.ps1` prefers `vcvarsall.bat` and assembles `INCLUDE`/`LIB`/`PATH` by hand when that script cannot provide a complete environment (for example when `reg.exe` is blocked by a security policy).
 
+### Toolchain configuration (optional)
+
+Nothing needs to be configured - every path is detected. To pin a specific toolchain, copy `utils\toolchain.ini.example` to either `utils\toolchain.ini` (local, ignored by git) or `%APPDATA%\awake\toolchain.ini` (shared by all checkouts) and uncomment what you need:
+
+```ini
+[visual-studio]
+path = C:\Program Files\Microsoft Visual Studio\18\Community
+
+[windows-sdk]
+root = C:\Program Files (x86)\Windows Kits\10
+
+[cmake]
+path = C:\Program Files\CMake\bin\cmake.exe
+
+[generator]
+name = Visual Studio 18 2026
+
+[sevenzip]
+path = C:\Program Files\7-Zip\7z.exe
+```
+
+Priority: `AWAKE_TOOLCHAIN` environment variable (path to a file) > `utils\toolchain.ini` > `%APPDATA%\awake\toolchain.ini` > automatic detection. When a tool cannot be found, the build asks for its path once and writes the answer into the configuration file; in a non-interactive session it fails with the exact setting to add instead. The whole list of supported entries is documented inside `toolchain.ini.example`.
+
 ## Testing
 
 A semi-automated smoke test lives in `utils/test/`:
@@ -113,6 +136,8 @@ awake/
 │   ├── build.bat      Launcher: runs build.ps1 with PowerShell 7
 │   ├── build.ps1      CMake configure + Release build (VS generator, NMake fallback)
 │   ├── msvc-env.ps1   MSVC/SDK environment (vcvarsall or manual fallback)
+│   ├── toolchain.ps1  Toolchain settings, detection and interactive fallback
+│   ├── toolchain.ini.example  Template: pin VS/SDK/CMake/7z/Git paths
 │   ├── gen_license_text.py  Regenerates common/src/license.cpp from LICENSE
 │   └── pubrelease.bat Launcher for pubrelease.ps1 (tag + build + zip, needs 7-Zip)
 ├── CMakeLists.txt     Build definition (targets: awake, awake.daemon)

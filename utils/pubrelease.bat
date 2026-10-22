@@ -23,7 +23,8 @@ rem Only starts the PowerShell 7 implementation (utils\pubrelease.ps1), which
 rem builds the project, creates the GPG-signed tag and packages the zip.
 rem
 rem Usage: utils\pubrelease.bat <tag>
-rem The tag is NOT pushed by this script.
+rem The tag is NOT pushed by this script. Toolchain paths (7-Zip, Git) come
+rem from utils\toolchain.ini, see utils\toolchain.ini.example.
 rem =============================================================================
 
 setlocal
@@ -33,18 +34,26 @@ if "%~1"=="" (
     exit /b 1
 )
 
-set "PWSH="
-where pwsh.exe >nul 2>&1
-if not errorlevel 1 set "PWSH=pwsh.exe"
-if not defined PWSH if exist "%ProgramFiles%\PowerShell\7\pwsh.exe" set "PWSH=%ProgramFiles%\PowerShell\7\pwsh.exe"
-if not defined PWSH if exist "%ProgramW6432%\PowerShell\7\pwsh.exe" set "PWSH=%ProgramW6432%\PowerShell\7\pwsh.exe"
-if not defined PWSH if exist "%SystemDrive%\Program Files\PowerShell\7\pwsh.exe" set "PWSH=%SystemDrive%\Program Files\PowerShell\7\pwsh.exe"
+call :find_pwsh
 if not defined PWSH (
     echo [pubrelease] ERROR: PowerShell 7 was not found.
-    echo [pubrelease] Install PowerShell 7 ^(winget install Microsoft.PowerShell^), or run:
-    echo [pubrelease]   pwsh -NoProfile -File "%~dp0pubrelease.ps1" ^<tag^>
+    echo [pubrelease] Install PowerShell 7 or set AWAKE_PWSH to the pwsh.exe path.
     exit /b 1
 )
 
 "%PWSH%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0pubrelease.ps1" %*
 exit /b %errorlevel%
+
+:find_pwsh
+set "PWSH="
+if defined AWAKE_PWSH if exist "%AWAKE_PWSH%" set "PWSH=%AWAKE_PWSH%"
+if defined PWSH exit /b 0
+where pwsh.exe >nul 2>&1
+if not errorlevel 1 (
+    for /f "delims=" %%P in ('where pwsh.exe') do if not defined PWSH set "PWSH=%%P"
+)
+if defined PWSH exit /b 0
+for %%D in (C D E F G H) do (
+    if not defined PWSH if exist "%%D:\Program Files\PowerShell\7\pwsh.exe" set "PWSH=%%D:\Program Files\PowerShell\7\pwsh.exe"
+)
+exit /b 0

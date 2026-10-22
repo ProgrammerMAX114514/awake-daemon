@@ -18,24 +18,22 @@
 # =============================================================================
 # msvc-env.ps1 - prepare an MSVC x64 build environment.
 #
-# Dot-source this file (". .\msvc-env.ps1") before invoking CMake. Two
-# strategies are used:
+# Dot-source this file to set INCLUDE/LIB/PATH for the current session.
+# The Visual Studio instance and the Windows SDK come from utils\toolchain.ps1
+# (configuration files first, then detection, then an interactive question).
 #
-#   1. Preferred: call vcvarsall.bat of the newest Visual Studio found under
-#      "%ProgramFiles%\Microsoft Visual Studio" (or the x86 variant) and
-#      import the environment it prints.
-#   2. Fallback: assemble INCLUDE/LIB/PATH from the MSVC toolset and the
-#      Windows SDK directories without touching the registry. Some
-#      environments block the programs vcvarsall relies on (for example
-#      reg.exe), which leaves cl.exe unusable even though the compiler is
-#      installed.
-#
-# Optional environment variables:
-#   AWAKE_SDK_ROOT - Windows Kits root when the SDK lives elsewhere than the
-#                    default locations (for example F:\Windows Kits\10).
+# Two strategies are used:
+#   1. Preferred: call vcvarsall.bat of the instance and import the
+#      environment it prints.
+#   2. Fallback: assemble INCLUDE/LIB/PATH from the MSVC toolset and the SDK
+#      directories without touching the registry. Some environments block the
+#      programs vcvarsall relies on (for example reg.exe), which leaves
+#      cl.exe unusable even though the compiler is installed.
 # =============================================================================
 
 $ErrorActionPreference = 'Stop'
+
+. (Join-Path $PSScriptRoot 'toolchain.ps1')
 
 function Test-CommandAvailable {
     param([string]$Name)
@@ -70,55 +68,7 @@ function Import-VcVarsEnvironment {
     }
 }
 
-function Get-VisualStudioRoots {
-    # Visual Studio is not necessarily installed on the system drive, so every
-    # fixed drive is probed. %ProgramFiles% alone is not enough (it can point
-    # to C: while the IDE lives on another drive).
-    $roots = @()
-    foreach ($drive in (Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)) {
-        foreach ($programFiles in @('Program Files', 'Program Files (x86)')) {
-            $candidate = Join-Path $drive.Root (Join-Path $programFiles 'Microsoft Visual Studio')
-            if (Test-Path $candidate) { $roots += $candidate }
-        }
-    }
-    foreach ($base in @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:ProgramW6432)) {
-        if ([string]::IsNullOrWhiteSpace($base)) { continue }
-        $candidate = Join-Path $base 'Microsoft Visual Studio'
-        if ((Test-Path $candidate) -and ($roots -notcontains $candidate)) { $roots += $candidate }
-    }
-    return $roots
-}
-
-function Find-VcVarsPath {
-    $candidates = @()
-    foreach ($root in (Get-VisualStudioRoots)) {
-        foreach ($edition in Get-ChildItem -Path $root -Directory -ErrorAction SilentlyContinue) {
-            foreach ($instance in Get-ChildItem -Path $edition.FullName -Directory -ErrorAction SilentlyContinue) {
-                $vcvars = Join-Path $instance.FullName 'VC\Auxiliary\Build\vcvarsall.bat'
-                if (Test-Path $vcvars) { $candidates += $vcvars }
-            }
-        }
-    }
-    if ($candidates.Count -eq 0) { return $null }
-    # Newest Visual Studio (year first in the folder name) wins.
-    return ($candidates | Sort-Object -Descending | Select-Object -First 1)
-}
-
-function Find-WindowsSdkRoot {
-    $candidates = @($env:AWAKE_SDK_ROOT, $env:WINDOWSSDKDIR)
-    foreach ($drive in (Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)) {
-        $candidates += (Join-Path $drive.Root 'Windows Kits\10')
-        $candidates += (Join-Path $drive.Root 'Program Files (x86)\Windows Kits\10')
-        $candidates += (Join-Path $drive.Root 'Program Files\Windows Kits\10')
-    }
-    foreach ($candidate in $candidates) {
-        if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
-        if (Test-Path (Join-Path $candidate 'Include')) { return $candidate }
-    }
-    return $null
-}
-
-function Find-NewestSdkVersion {
+function Get-NewestSdkVersion {
     param([string]$KitsRoot)
     $versions = Get-ChildItem -Path (Join-Path $KitsRoot 'Include') -Directory -ErrorAction SilentlyContinue |
         Where-Object { Test-Path (Join-Path $_.FullName 'um') } |
@@ -127,27 +77,33 @@ function Find-NewestSdkVersion {
     return $versions[-1].Name
 }
 
+function Get-ToolsetName {
+    param([string]$VisualStudioRoot)
+    # An explicit version wins, otherwise the newest toolset is used.
+    $configured = Get-ToolSetting -Section 'msvc' -Key 'version'
+    if ($configured) { return $configured }
+    $toolsRoot = Join-Path $VisualStudioRoot 'VC\Tools\MSVC'
+    $toolsets = Get-ChildItem -Path $toolsRoot -Directory -ErrorAction SilentlyContinue | Sort-Object Name
+    if (-not $toolsets) { return $null }
+    return $toolsets[-1].Name
+}
+
 function Enable-ManualMsvcEnvironment {
-    param([string]$VsInstanceRoot)
+    param([string]$VisualStudioRoot)
 
-    $msvcRoot = Join-Path $VsInstanceRoot 'VC\Tools\MSVC'
-    if (-not (Test-Path $msvcRoot)) { return $false }
-    $toolset = Get-ChildItem -Path $msvcRoot -Directory -ErrorAction SilentlyContinue |
-        Sort-Object Name | Select-Object -Last 1
-    if (-not $toolset) { return $false }
+    $toolsetName = Get-ToolsetName -VisualStudioRoot $VisualStudioRoot
+    if (-not $toolsetName) { return $false }
+    $toolsetRoot = Join-Path $VisualStudioRoot "VC\Tools\MSVC\$toolsetName"
+    if (-not (Test-Path $toolsetRoot)) { return $false }
 
-    $kitsRoot = Find-WindowsSdkRoot
-    if (-not $kitsRoot) {
-        throw 'No Windows SDK found. Set AWAKE_SDK_ROOT to the Windows Kits directory.'
-    }
-    $sdkVersion = Find-NewestSdkVersion -KitsRoot $kitsRoot
-    if (-not $sdkVersion) {
-        throw "No SDK headers under '$kitsRoot\Include'."
-    }
+    $kitsRoot = Get-WindowsSdkRoot
+    $sdkVersion = Get-ToolSetting -Section 'windows-sdk' -Key 'version'
+    if (-not $sdkVersion) { $sdkVersion = Get-NewestSdkVersion -KitsRoot $kitsRoot }
+    if (-not $sdkVersion) { throw "No SDK headers under '$kitsRoot\Include'." }
 
-    $msvcInclude = Join-Path $toolset.FullName 'include'
-    $msvcLib = Join-Path $toolset.FullName 'lib\x64'
-    $msvcBin = Join-Path $toolset.FullName 'bin\Hostx64\x64'
+    $msvcInclude = Join-Path $toolsetRoot 'include'
+    $msvcLib = Join-Path $toolsetRoot 'lib\x64'
+    $msvcBin = Join-Path $toolsetRoot 'bin\Hostx64\x64'
     $sdkInclude = Join-Path $kitsRoot "Include\$sdkVersion"
     $sdkLib = Join-Path $kitsRoot "Lib\$sdkVersion"
     $sdkBin = Join-Path $kitsRoot "bin\$sdkVersion\x64"
@@ -166,9 +122,9 @@ function Enable-ManualMsvcEnvironment {
         (Join-Path $sdkLib 'um\x64')
     ) -join ';'
     $env:PATH = "$msvcBin;$sdkBin;$env:PATH"
-    $env:VCToolsVersion = $toolset.Name
+    $env:VCToolsVersion = $toolsetName
 
-    Write-Host "[msvc-env] Environment ready (manual): MSVC $($toolset.Name), SDK $sdkVersion."
+    Write-Host "[msvc-env] Environment ready (manual): MSVC $toolsetName, SDK $sdkVersion."
     return (Test-ToolchainReady)
 }
 
@@ -181,11 +137,11 @@ if (Test-ToolchainReady) {
     return
 }
 
-$vcvars = Find-VcVarsPath
-$vsRoot = $null
-if ($vcvars) {
-    # ...\Build\vcvarsall.bat -> Build -> Auxiliary -> VC -> <Visual Studio instance>
-    $vsRoot = (Get-Item $vcvars).Directory.Parent.Parent.Parent.FullName
+$vsRoot = Get-VisualStudioRoot
+Write-Host "[msvc-env] Visual Studio: $vsRoot"
+
+$vcvars = Join-Path $vsRoot 'VC\Auxiliary\Build\vcvarsall.bat'
+if (Test-Path $vcvars) {
     Write-Host "[msvc-env] Using '$vcvars'..."
     Import-VcVarsEnvironment -VcVarsPath $vcvars
     if (Test-ToolchainReady) {
@@ -193,23 +149,8 @@ if ($vcvars) {
         return
     }
     Write-Host '[msvc-env] vcvarsall left an incomplete environment, using the manual fallback.'
-} else {
-    Write-Host '[msvc-env] No vcvarsall.bat found, using the manual fallback.'
-    # Without vcvarsall, look for the toolset directly under the known roots.
-    $instances = @()
-    foreach ($root in (Get-VisualStudioRoots)) {
-        $instances += Get-ChildItem -Path $root -Directory -ErrorAction SilentlyContinue |
-            ForEach-Object { Get-ChildItem -Path $_.FullName -Directory -ErrorAction SilentlyContinue } |
-            Where-Object { Test-Path (Join-Path $_.FullName 'VC\Tools\MSVC') }
-    }
-    if ($instances) {
-        $vsRoot = ($instances | Sort-Object Name | Select-Object -Last 1).FullName
-    }
 }
 
-if (-not $vsRoot) {
-    throw 'No Visual Studio installation with the C++ tools was found.'
-}
-if (-not (Enable-ManualMsvcEnvironment -VsInstanceRoot $vsRoot)) {
-    throw 'cl.exe is still not available after the manual environment setup.'
+if (-not (Enable-ManualMsvcEnvironment -VisualStudioRoot $vsRoot)) {
+    throw 'cl.exe is still not available after the manual environment setup. Check the Visual Studio and Windows SDK settings in utils\toolchain.ini.'
 }

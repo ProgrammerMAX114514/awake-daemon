@@ -20,6 +20,9 @@ CMakeUserPresets.json
 __pycache__/
 *.pyc
 
+# Local toolchain configuration (see utils/toolchain.ini.example)
+utils/toolchain.ini
+
 # ZCode workspace metadata
 .zcode/
 
