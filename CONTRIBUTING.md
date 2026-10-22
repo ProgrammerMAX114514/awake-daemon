@@ -8,7 +8,8 @@ welcome.
 
 1. Fork/clone the repository.
 2. Build the project: `utils\build.bat` (requires Visual Studio 2026 with
-   the MSVC x64 toolset and CMake, see the paths inside the script).
+   the MSVC x64 toolset, CMake and PowerShell 7; the batch file only starts
+   `utils\build.ps1`, which finds the toolchain on its own).
 3. Run the smoke test: `python utils\test\smoketest.py` (requires Python
    3.8+, no third-party packages). The configuration lives in
    `utils\test\smoketest.ini`.

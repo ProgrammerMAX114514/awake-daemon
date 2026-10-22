@@ -31,12 +31,13 @@
 - Windows 10 或更高版本
 - Visual Studio 2026（MSVC x64 工具集）
 - CMake 4.x
+- PowerShell 7（`pwsh`）——仅构建需要，运行工具不需要
 
-工具链路径配置在 `build.bat` 中，请根据实际安装位置调整。
+工具链会自动发现；若 Windows SDK 不在默认位置，可设置环境变量 `AWAKE_SDK_ROOT`。
 
 ## 构建
 
-在任意目录运行 `utils\build.bat`。它会初始化 MSVC x64 环境，使用 Visual Studio 2026 生成器配置 CMake 并构建 Release 配置。产物位于：
+在任意目录运行 `utils\build.bat`。该 bat 只是 `utils\build.ps1` 的启动器；PowerShell 脚本会准备 MSVC x64 环境（`utils\msvc-env.ps1`）并构建 Release 配置。它优先使用 Visual Studio 2026 的 CMake 生成器，无法使用时自动回退到 NMake 生成器，因此产物始终位于：
 
 ```
 build\Release\awake.exe
@@ -44,6 +45,8 @@ build\Release\awake.daemon.exe
 ```
 
 两个可执行文件均静态链接 C 运行时，运行时不依赖构建目录，可任意拷贝使用。
+
+`utils\msvc-env.ps1` 优先调用 `vcvarsall.bat`；当它无法给出完整环境时（例如 `reg.exe` 被安全策略拦截），改为手工拼装 `INCLUDE`/`LIB`/`PATH`。
 
 ## 测试
 
@@ -107,9 +110,11 @@ notepad.exe
 ```
 awake/
 ├── utils/
-│   ├── build.bat      一键构建脚本（MSVC x64 + CMake）
+│   ├── build.bat      启动器：用 PowerShell 7 运行 build.ps1
+│   ├── build.ps1      CMake 配置 + Release 构建（VS 生成器，失败回退 NMake）
+│   ├── msvc-env.ps1   MSVC/SDK 环境准备（vcvarsall 或手工回退）
 │   ├── gen_license_text.py 从 LICENSE 重新生成 common/src/license.cpp
-│   └── pubrelease.bat 发布脚本：打 tag + 构建 + 打 zip 包（需要 7-Zip）
+│   └── pubrelease.bat pubrelease.ps1 的启动器（打 tag + 构建 + 打包，需要 7-Zip）
 ├── CMakeLists.txt     构建定义（目标：awake、awake.daemon）
 ├── common/            客户端与守护进程共用代码
 │   ├── include/       console（彩色输出）、config（awake.ini）、ipc（命名管道）、

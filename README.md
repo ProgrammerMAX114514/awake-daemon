@@ -31,12 +31,13 @@ Current version: **0.5.0-beta**
 - Windows 10 or later
 - Visual Studio 2026 (MSVC x64 toolset)
 - CMake 4.x
+- PowerShell 7 (`pwsh`) - only needed to build, not to run the tool
 
-The paths to the toolchain are configured in `build.bat`; adjust them to match your installation.
+The toolchain is discovered automatically; set `AWAKE_SDK_ROOT` when the Windows SDK is not in a default location.
 
 ## Build
 
-Run `utils\build.bat` (from any directory). It initializes the MSVC x64 environment, configures CMake with the Visual Studio 2026 generator and builds the Release configuration. The executables are written to:
+Run `utils\build.bat` (from any directory). The batch file is a thin launcher for `utils\build.ps1`; the PowerShell script prepares the MSVC x64 environment (`utils\msvc-env.ps1`) and builds the Release configuration. It first tries the Visual Studio 2026 CMake generator and falls back to the NMake generator when that generator cannot run, so the executables are always written to:
 
 ```
 build\Release\awake.exe
@@ -44,6 +45,8 @@ build\Release\awake.daemon.exe
 ```
 
 Both executables statically link the C runtime and have no runtime dependencies on the build directory - copy them anywhere you like.
+
+`utils\msvc-env.ps1` prefers `vcvarsall.bat` and assembles `INCLUDE`/`LIB`/`PATH` by hand when that script cannot provide a complete environment (for example when `reg.exe` is blocked by a security policy).
 
 ## Testing
 
@@ -107,9 +110,11 @@ While any listed image name is running, the daemon blocks idle sleep/hibernation
 ```
 awake/
 ├── utils/
-│   ├── build.bat      One-shot build script (MSVC x64 + CMake)
+│   ├── build.bat      Launcher: runs build.ps1 with PowerShell 7
+│   ├── build.ps1      CMake configure + Release build (VS generator, NMake fallback)
+│   ├── msvc-env.ps1   MSVC/SDK environment (vcvarsall or manual fallback)
 │   ├── gen_license_text.py  Regenerates common/src/license.cpp from LICENSE
-│   └── pubrelease.bat Release script: tag + build + zip (needs 7-Zip)
+│   └── pubrelease.bat Launcher for pubrelease.ps1 (tag + build + zip, needs 7-Zip)
 ├── CMakeLists.txt     Build definition (targets: awake, awake.daemon)
 ├── common/            Code shared by client and daemon
 │   ├── include/       console (colors), config (awake.ini), ipc (named pipe),

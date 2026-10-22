@@ -17,42 +17,35 @@ rem AI-GENERATED SOFTWARE: this file was generated with AI assistance.
 rem Please review it carefully before use. The author is not liable for
 rem any consequences arising from the use of this software.
 rem =============================================================================
-rem awake - one-shot build script (lives in utils\)
+rem awake - build launcher (lives in utils\)
 rem
-rem Sets up the MSVC x64 environment, then configures and builds the project
-rem with CMake (Visual Studio 2026 generator, Release configuration).
-rem The resulting executables are placed in build\Release\.
-rem The script can be invoked from any working directory; it always operates
-rem on the repository root (the parent of utils\).
+rem Only starts the PowerShell 7 implementation (utils\build.ps1), which does
+rem the actual work: MSVC environment setup (utils\msvc-env.ps1), CMake
+rem configuration and the Release build. The launcher exists so that the
+rem documented command stays "utils\build.bat" and so that the shell is not
+rem involved in the batch quoting rules.
+rem
+rem Extra arguments are forwarded to build.ps1 (for example -NoFallback).
+rem The script can be invoked from any working directory.
 rem =============================================================================
 
 setlocal
 
-rem Change to the repository root (parent of the directory holding this file).
-cd /d "%~dp0.."
-
-echo [build] Setting up MSVC x64 environment...
-call "F:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
-if errorlevel 1 (
-    echo [build] ERROR: failed to initialize the MSVC x64 environment.
+rem Locate PowerShell 7: PATH first, then the usual installation folders.
+rem %ProgramFiles% can point to a non-system drive, so the system drive is
+rem checked explicitly as well.
+set "PWSH="
+where pwsh.exe >nul 2>&1
+if not errorlevel 1 set "PWSH=pwsh.exe"
+if not defined PWSH if exist "%ProgramFiles%\PowerShell\7\pwsh.exe" set "PWSH=%ProgramFiles%\PowerShell\7\pwsh.exe"
+if not defined PWSH if exist "%ProgramW6432%\PowerShell\7\pwsh.exe" set "PWSH=%ProgramW6432%\PowerShell\7\pwsh.exe"
+if not defined PWSH if exist "%SystemDrive%\Program Files\PowerShell\7\pwsh.exe" set "PWSH=%SystemDrive%\Program Files\PowerShell\7\pwsh.exe"
+if not defined PWSH (
+    echo [build] ERROR: PowerShell 7 was not found.
+    echo [build] Install PowerShell 7 ^(winget install Microsoft.PowerShell^), or run:
+    echo [build]   pwsh -NoProfile -File "%~dp0build.ps1"
     exit /b 1
 )
 
-echo [build] Configuring with CMake...
-"F:\Program Files\CMake\bin\cmake.exe" -S . -B build -G "Visual Studio 18 2026" -A x64
-if errorlevel 1 (
-    echo [build] ERROR: CMake configuration failed.
-    exit /b 1
-)
-
-echo [build] Building (Release)...
-"F:\Program Files\CMake\bin\cmake.exe" --build build --config Release
-if errorlevel 1 (
-    echo [build] ERROR: build failed.
-    exit /b 1
-)
-
-echo [build] Done. Executables are in build\Release\:
-dir /b build\Release\awake.exe build\Release\awake.daemon.exe
-
-endlocal
+"%PWSH%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0build.ps1" %*
+exit /b %errorlevel%

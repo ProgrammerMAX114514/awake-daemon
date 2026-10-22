@@ -17,86 +17,34 @@ rem AI-GENERATED SOFTWARE: this file was generated with AI assistance.
 rem Please review it carefully before use. The author is not liable for
 rem any consequences arising from the use of this software.
 rem =============================================================================
-rem awake - release packaging script (lives in utils\)
+rem awake - release launcher (lives in utils\)
+rem
+rem Only starts the PowerShell 7 implementation (utils\pubrelease.ps1), which
+rem builds the project, creates the GPG-signed tag and packages the zip.
 rem
 rem Usage: utils\pubrelease.bat <tag>
-rem
-rem For the given tag (for example 0.2.0-beta) this script:
-rem   1. builds the project (Release) via utils\build.bat,
-rem   2. creates the GPG-signed git tag <tag> ("git tag -s"),
-rem   3. packages the executables plus LICENSE and NOTICE into
-rem      build\Release\publish\tag-<tag>\awake-daemon.win64.zip using 7-Zip.
-rem
-rem The script can be invoked from any working directory; it always operates
-rem on the repository root (the parent of utils\). The tag is NOT pushed -
-rem push it manually with: git push origin <tag>
+rem The tag is NOT pushed by this script.
 rem =============================================================================
 
 setlocal
 
-set "SEVENZIP=C:\Program Files\7-Zip\7z.exe"
-
-rem --- Argument check -------------------------------------------------------
 if "%~1"=="" (
     echo [pubrelease] ERROR: missing tag argument. Usage: utils\pubrelease.bat ^<tag^>
     exit /b 1
 )
-set "TAG=%~1"
 
-rem --- Change to the repository root (parent of utils\) ---------------------
-cd /d "%~dp0.."
-
-rem --- Prerequisite checks --------------------------------------------------
-if not exist "%SEVENZIP%" (
-    echo [pubrelease] ERROR: 7-Zip not found at "%SEVENZIP%".
-    exit /b 1
-)
-git rev-parse -q --verify "refs/tags/%TAG%" >nul 2>&1
-if not errorlevel 1 (
-    echo [pubrelease] ERROR: tag "%TAG%" already exists.
-    exit /b 1
-)
-
-rem --- Build -----------------------------------------------------------------
-echo [pubrelease] Building...
-call "%~dp0build.bat"
-if errorlevel 1 (
-    echo [pubrelease] ERROR: build failed.
+set "PWSH="
+where pwsh.exe >nul 2>&1
+if not errorlevel 1 set "PWSH=pwsh.exe"
+if not defined PWSH if exist "%ProgramFiles%\PowerShell\7\pwsh.exe" set "PWSH=%ProgramFiles%\PowerShell\7\pwsh.exe"
+if not defined PWSH if exist "%ProgramW6432%\PowerShell\7\pwsh.exe" set "PWSH=%ProgramW6432%\PowerShell\7\pwsh.exe"
+if not defined PWSH if exist "%SystemDrive%\Program Files\PowerShell\7\pwsh.exe" set "PWSH=%SystemDrive%\Program Files\PowerShell\7\pwsh.exe"
+if not defined PWSH (
+    echo [pubrelease] ERROR: PowerShell 7 was not found.
+    echo [pubrelease] Install PowerShell 7 ^(winget install Microsoft.PowerShell^), or run:
+    echo [pubrelease]   pwsh -NoProfile -File "%~dp0pubrelease.ps1" ^<tag^>
     exit /b 1
 )
 
-rem --- Tag (GPG-signed) -------------------------------------------------------
-echo [pubrelease] Creating signed tag "%TAG%"...
-git tag -s "%TAG%" -m "awake %TAG%"
-if errorlevel 1 (
-    echo [pubrelease] ERROR: failed to create tag "%TAG%".
-    exit /b 1
-)
-
-rem --- Package ----------------------------------------------------------------
-rem Stage the distributable files in a temporary folder so that the zip
-rem archive contains them at its root (no build\Release\... path prefix).
-set "PUB=build\Release\publish\tag-%TAG%"
-set "STAGE=%PUB%\stage"
-mkdir "%STAGE%" 2>nul
-copy /y "build\Release\awake.exe"       "%STAGE%" >nul
-copy /y "build\Release\awake.daemon.exe" "%STAGE%" >nul
-copy /y "LICENSE" "%STAGE%" >nul
-copy /y "NOTICE"  "%STAGE%" >nul
-
-echo [pubrelease] Creating "%PUB%\awake-daemon.win64.zip"...
-pushd "%STAGE%"
-"%SEVENZIP%" a -tzip "..\awake-daemon.win64.zip" * -bso0
-popd
-if errorlevel 1 (
-    echo [pubrelease] ERROR: zip packaging failed.
-    popd
-    exit /b 1
-)
-rd /s /q "%STAGE%"
-
-echo [pubrelease] Done. Release artifacts:
-dir /b "%PUB%"
-echo [pubrelease] Remember to push the tag: git push origin %TAG%
-
-endlocal
+"%PWSH%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0pubrelease.ps1" %*
+exit /b %errorlevel%
