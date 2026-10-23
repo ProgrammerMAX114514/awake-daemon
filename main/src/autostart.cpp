@@ -94,9 +94,15 @@ bool Enable(std::string& error) {
     }
 
     HKEY key = NULL;
-    if (RegOpenKeyExA(HKEY_CURRENT_USER, kRunKeyPath, 0, KEY_SET_VALUE, &key) != ERROR_SUCCESS) {
+    // Open or create: a fresh user profile has no HKCU\...\Run key at all, so
+    // RegOpenKeyExA would fail with ERROR_FILE_NOT_FOUND and "daemon enable"
+    // could never work there (this is exactly what the CI runner showed).
+    const LRESULT openResult = RegCreateKeyExA(HKEY_CURRENT_USER, kRunKeyPath, 0, NULL,
+                                               REG_OPTION_NON_VOLATILE, KEY_SET_VALUE,
+                                               NULL, &key, NULL);
+    if (openResult != ERROR_SUCCESS) {
         error = "cannot open the registry run key (error " +
-                std::to_string(GetLastError()) + ")";
+                std::to_string(openResult) + ")";
         return false;
     }
     const std::string commandLine = BuildAutostartCommandLine();
@@ -113,9 +119,13 @@ bool Enable(std::string& error) {
 
 bool Disable(std::string& error) {
     HKEY key = NULL;
-    if (RegOpenKeyExA(HKEY_CURRENT_USER, kRunKeyPath, 0, KEY_SET_VALUE, &key) != ERROR_SUCCESS) {
+    const LRESULT openResult = RegOpenKeyExA(HKEY_CURRENT_USER, kRunKeyPath, 0, KEY_SET_VALUE, &key);
+    if (openResult == ERROR_FILE_NOT_FOUND) {
+        return true; // no key means no autostart entry - keep disable idempotent
+    }
+    if (openResult != ERROR_SUCCESS) {
         error = "cannot open the registry run key (error " +
-                std::to_string(GetLastError()) + ")";
+                std::to_string(openResult) + ")";
         return false;
     }
     const LRESULT result = RegDeleteValueA(key, kValueName);

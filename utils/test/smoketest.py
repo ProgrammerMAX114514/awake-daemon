@@ -399,9 +399,14 @@ def write_pipe_garbage(cfg, payload_bytes):
 
 def corrupt_autostart_path(cfg, fake_path):
     """Overwrites the autostart registry value with a command line pointing
-    to a nonexistent executable (simulates a stale entry)."""
+    to a nonexistent executable (simulates a stale entry).
+
+    CreateKeyEx opens the key when it exists and creates it otherwise: a fresh
+    user profile (for example on a CI runner) has no HKCU\...\Run key, and the
+    test must still be able to plant the stale value there."""
     data = '"%s" --internal-daemon awake-internal-daemon-launch' % fake_path
-    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, cfg["registry_key"], 0, winreg.KEY_SET_VALUE) as key:
+    with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, cfg["registry_key"], 0,
+                            winreg.KEY_SET_VALUE) as key:
         winreg.SetValueEx(key, cfg["value_name"], 0, winreg.REG_SZ, data)
 
 
