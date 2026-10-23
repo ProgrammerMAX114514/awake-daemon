@@ -398,7 +398,7 @@ def write_pipe_garbage(cfg, payload_bytes):
 
 
 def corrupt_autostart_path(cfg, fake_path):
-    """Overwrites the autostart registry value with a command line pointing
+    r"""Overwrites the autostart registry value with a command line pointing
     to a nonexistent executable (simulates a stale entry).
 
     CreateKeyEx opens the key when it exists and creates it otherwise: a fresh
@@ -461,6 +461,38 @@ def test_screen_keep_awake(cfg):
     code, out = run_client(cfg, ["scr", "0"])
     check("alias 'scr 0' disables screen keep-awake",
           code == 0 and "Screen keep-awake DISABLED" in out)
+
+
+def test_timed_keep_awake(cfg):
+    """F1: a timed keep-awake releases itself when the period is over."""
+    code, out = run_client(cfg, ["1", "for", "2s"])
+    check("'1 for 2s' enables a timed keep-awake",
+          code == 0 and "ENABLED for 2s" in out, out.strip())
+    code, out = run_client(cfg, ["status"])
+    check("status shows the remaining time",
+          code == 0 and "expires in" in out, out.strip())
+
+    time.sleep(4)  # the daemon releases it on its own within ~1 s
+    code, out = run_client(cfg, ["status"])
+    keep_awake_line = [l for l in out.splitlines() if l.startswith("Keep-awake:")]
+    check("the keep-awake is released when the period ends",
+          code == 0 and keep_awake_line and "INACTIVE" in keep_awake_line[0], out.strip())
+
+    code, out = run_client(cfg, ["screen", "on", "for", "2s"])
+    check("'screen on for 2s' enables a timed screen keep-awake",
+          code == 0 and "ENABLED for 2s" in out, out.strip())
+    time.sleep(4)
+    code, out = run_client(cfg, ["status"])
+    screen_line = [l for l in out.splitlines() if l.startswith("Screen:")]
+    check("the screen keep-awake is released when the period ends",
+          code == 0 and screen_line and "INACTIVE" in screen_line[0], out.strip())
+
+    code, out = run_client(cfg, ["1", "for", "30"])
+    check("a period without a unit is rejected",
+          code == 1 and "as a period" in out, out.strip())
+    code, out = run_client(cfg, ["1", "until", "25:00"])
+    check("an invalid clock time is rejected",
+          code == 1 and "as a time" in out, out.strip())
 
 
 def test_watch_list(cfg):
@@ -606,6 +638,7 @@ def main():
     test_protocol_robustness(cfg)
     test_keep_awake(cfg)
     test_screen_keep_awake(cfg)
+    test_timed_keep_awake(cfg)
     test_watch_list(cfg)
     test_reload_and_reset(cfg)
     test_autostart(cfg)

@@ -32,12 +32,26 @@ const char* const kReqGetApps   = "GET_APPS";
 const char* const kReqReload    = "RELOAD";
 const char* const kReqShutdown  = "SHUTDOWN";
 
-std::string MakeKeepAwakeRequest(bool enable) {
-    return enable ? "KEEP_AWAKE 1" : "KEEP_AWAKE 0";
+std::string MakeKeepAwakeRequest(bool enable, unsigned int seconds) {
+    if (!enable) {
+        return "KEEP_AWAKE 0";
+    }
+    std::string line = "KEEP_AWAKE 1";
+    if (seconds > 0) {
+        line += " " + std::to_string(seconds);
+    }
+    return line;
 }
 
-std::string MakeScreenRequest(bool enable) {
-    return enable ? "SCREEN 1" : "SCREEN 0";
+std::string MakeScreenRequest(bool enable, unsigned int seconds) {
+    if (!enable) {
+        return "SCREEN 0";
+    }
+    std::string line = "SCREEN 1";
+    if (seconds > 0) {
+        line += " " + std::to_string(seconds);
+    }
+    return line;
 }
 
 std::string MakePingRequest() {
@@ -54,6 +68,8 @@ std::string SerializeStatus(const DaemonStatus& status) {
     response += "ACTIVE=" + std::string(status.active ? "1" : "0") + "\n";
     response += "ELEVATED=" + std::string(status.elevated ? "1" : "0") + "\n";
     response += "VERSION=" + status.version + "\n";
+    response += "MANUAL_REMAIN=" + std::to_string(status.manualRemaining) + "\n";
+    response += "SCREEN_REMAIN=" + std::to_string(status.screenRemaining) + "\n";
     return response;
 }
 
@@ -82,6 +98,10 @@ bool ParseStatusResponse(const std::string& response, DaemonStatus& status) {
             status.elevated = (line.compare(9, 1, "1") == 0);
         } else if (line.compare(0, 8, "VERSION=") == 0) {
             status.version = line.substr(8);
+        } else if (line.compare(0, 14, "MANUAL_REMAIN=") == 0) {
+            status.manualRemaining = std::atoi(line.c_str() + 14);
+        } else if (line.compare(0, 14, "SCREEN_REMAIN=") == 0) {
+            status.screenRemaining = std::atoi(line.c_str() + 14);
         }
         if (lineEnd == response.size()) {
             break;

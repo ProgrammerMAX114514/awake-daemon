@@ -102,6 +102,7 @@ add_library(awake_common STATIC
     common/src/privilege.cpp
     common/src/process.cpp
     common/src/protocol.cpp
+    common/src/timeparse.cpp
 )
 # The generated directory comes first so that "version.h" always resolves to
 # the configured copy.

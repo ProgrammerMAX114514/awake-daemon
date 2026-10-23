@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <ctime>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -37,6 +38,7 @@
 #include "ipc.h"
 #include "license.h"
 #include "protocol.h"
+#include "timeparse.h"
 #include "version.h"
 
 // -----------------------------------------------------------------------------
@@ -44,6 +46,19 @@
 // -----------------------------------------------------------------------------
 
 // Prints the colored usage help. This is shown for "awake help", for
+// Formats "now + seconds" as a local "HH:MM" clock time, used by the
+// confirmation messages of a timed keep-awake.
+static std::string FormatLocalClock(unsigned int seconds) {
+    const std::time_t target = std::time(NULL) + static_cast<std::time_t>(seconds);
+    std::tm local;
+    if (localtime_s(&local, &target) != 0) {
+        return "?";
+    }
+    char buffer[16] = { 0 };
+    std::snprintf(buffer, sizeof(buffer), "%02d:%02d", local.tm_hour, local.tm_min);
+    return std::string(buffer);
+}
+
 // One row of the alias table: the canonical command and every other spelling
 // that dispatches to it. Commands without an alias are not listed here; they
 // are already shown in the usage block.
@@ -84,9 +99,12 @@ const CommandEntry kCommandEntries[] = {
     { "aliases",         "Show every command alias (same as 'awake a').", true },
     { "0",               "Disable keep-awake (restore default power behavior).", true },
     { "1",               "Enable keep-awake (block idle sleep and hibernation).", true },
+    { "1 for <period>",  "Enable keep-awake for a limited time, e.g. 30m, 1h30m, 2h.", true },
+    { "1 until <HH:MM>", "Enable keep-awake until that clock time (tomorrow if passed).", true },
     { "status",          "Show daemon, keep-awake, screen and watch list status.", true },
     { "screen",          "Turn the screen keep-awake on or off (on / off).", false },
     { "screen on",       "Keep the screen on (blocks screen off, screensaver and idle lock).", true },
+    { "screen on for <period>", "Keep the screen on for a limited time, e.g. 2h.", true },
     { "screen off",      "Stop keeping the screen on.", true },
     { "daemon",          "Start, stop or configure the daemon (on / off / enable / disable).", false },
     { "daemon on",       "Start the background daemon.", true },
@@ -461,17 +479,22 @@ bool cli::EnsureLicenseAccepted() {
 }
 
 // "awake 0" / "awake 1": forward the request to the daemon.
-int cli::CmdSetKeepAwake(bool enable) {
+int cli::CmdSetKeepAwake(bool enable, unsigned int seconds) {
     if (!EnsureDaemonRunning()) {
         return 1;
     }
     std::string response;
-    if (!ipc::SendRequest(protocol::MakeKeepAwakeRequest(enable), response)) {
+    if (!ipc::SendRequest(protocol::MakeKeepAwakeRequest(enable, seconds), response)) {
         console::PrintLine(console::kColorRed, "Error: lost contact with the daemon.");
         return 1;
     }
     if (response.compare(0, 2, "OK") == 0) {
-        if (enable) {
+        if (enable && seconds > 0) {
+            console::Printf(console::kColorGreen, "Keep-awake ENABLED for %s",
+                            timeparse::FormatDuration(seconds).c_str());
+            console::Printf(console::kColorReset, " (until %s). Idle sleep/hibernation is now blocked.\n",
+                            FormatLocalClock(seconds).c_str());
+        } else if (enable) {
             console::PrintLine(console::kColorGreen, "Keep-awake ENABLED. Idle sleep/hibernation is now blocked.");
         } else {
             console::PrintLine(console::kColorGreen, "Keep-awake DISABLED. The system uses its default power behavior.");
@@ -483,17 +506,22 @@ int cli::CmdSetKeepAwake(bool enable) {
 }
 
 // "awake screen on" / "awake screen off": forward the request to the daemon.
-int cli::CmdSetScreenKeepAwake(bool enable) {
+int cli::CmdSetScreenKeepAwake(bool enable, unsigned int seconds) {
     if (!EnsureDaemonRunning()) {
         return 1;
     }
     std::string response;
-    if (!ipc::SendRequest(protocol::MakeScreenRequest(enable), response)) {
+    if (!ipc::SendRequest(protocol::MakeScreenRequest(enable, seconds), response)) {
         console::PrintLine(console::kColorRed, "Error: lost contact with the daemon.");
         return 1;
     }
     if (response.compare(0, 2, "OK") == 0) {
-        if (enable) {
+        if (enable && seconds > 0) {
+            console::Printf(console::kColorGreen, "Screen keep-awake ENABLED for %s",
+                            timeparse::FormatDuration(seconds).c_str());
+            console::Printf(console::kColorReset, " (until %s). Screen off, screensaver and idle lock are now blocked.\n",
+                            FormatLocalClock(seconds).c_str());
+        } else if (enable) {
             console::PrintLine(console::kColorGreen, "Screen keep-awake ENABLED. Screen off, screensaver and idle lock are now blocked.");
         } else {
             console::PrintLine(console::kColorGreen, "Screen keep-awake DISABLED. The screen behaves according to the power settings.");

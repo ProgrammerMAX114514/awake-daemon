@@ -40,6 +40,36 @@ namespace server {
 
 namespace {
 
+// Longest accepted expiry, mirroring timeparse::kMaxDurationSeconds: the
+// client already rejects longer periods, this keeps a hand crafted request
+// from installing an absurd deadline.
+const unsigned int kMaxSecondsArgument = 365u * 24u * 60u * 60u;
+
+// Parses the optional "<seconds>" argument of KEEP_AWAKE/SCREEN. Only plain
+// decimal digits are accepted; 0 and values above the limit are rejected.
+bool ParseSecondsArgument(const std::string& text, unsigned int& seconds) {
+    seconds = 0;
+    if (text.empty()) {
+        return false;
+    }
+    unsigned long long value = 0;
+    for (size_t i = 0; i < text.size(); ++i) {
+        const char c = text[i];
+        if (c < '0' || c > '9') {
+            return false;
+        }
+        value = value * 10 + static_cast<unsigned long long>(c - '0');
+        if (value > kMaxSecondsArgument) {
+            return false;
+        }
+    }
+    if (value == 0) {
+        return false;
+    }
+    seconds = static_cast<unsigned int>(value);
+    return true;
+}
+
 // Builds the GET_STATUS response: "OK" plus KEY=VALUE lines carrying the
 // cached daemon state (serialized by the shared protocol layer).
 std::string HandleGetStatus() {
@@ -50,6 +80,8 @@ std::string HandleGetStatus() {
     status.active = (status.manual || status.app || status.screen);
     status.elevated = privilege::IsProcessElevated();
     status.version = version::kVersion;
+    status.manualRemaining = daemonstate::GetManualRemaining();
+    status.screenRemaining = daemonstate::GetScreenRemaining();
     return protocol::SerializeStatus(status);
 }
 
@@ -90,40 +122,50 @@ std::string HandleRequest(const std::string& request) {
         // client/daemon version mismatches.
         return std::string("OK PONG ") + version::kVersion + "\n";
     }
-    if (verb == "KEEP_AWAKE") {
-        // The line is already trimmed, so the argument is clean.
+    if (verb == "KEEP_AWAKE" || verb == "SCREEN") {
+        // Both verbs take "<0|1>" and, since F1, an optional expiry in seconds
+        // ("KEEP_AWAKE 1 1800"). The line is already trimmed.
+        const bool keepAwake = (verb == "KEEP_AWAKE");
         const std::string arg = (firstSpace == std::string::npos)
                                     ? ""
                                     : line.substr(firstSpace + 1);
-        if (arg == "1") {
-            daemonstate::SetManual(true);
-            daemonstate::WakePowerThread(); // apply immediately instead of waiting for the next poll
-            return "OK keep-awake enabled\n";
+        const size_t argumentGap = arg.find(' ');
+        const std::string state = arg.substr(0, argumentGap);
+        const std::string secondsText = (argumentGap == std::string::npos)
+                                            ? ""
+                                            : arg.substr(argumentGap + 1);
+
+        const std::string errorLine = "ERR " + verb + " expects 0, 1 or 1 <seconds>\n";
+        if (state != "0" && state != "1") {
+            return errorLine;
         }
-        if (arg == "0") {
-            daemonstate::SetManual(false);
-            daemonstate::WakePowerThread();
-            return "OK keep-awake disabled\n";
+
+        unsigned int seconds = 0;
+        if (!secondsText.empty()) {
+            // A period is only meaningful together with "1".
+            if (state == "0" || !ParseSecondsArgument(secondsText, seconds)) {
+                return errorLine;
+            }
         }
-        return "ERR KEEP_AWAKE expects 0 or 1\n";
-    }
-    if (verb == "SCREEN") {
-        // Same argument handling as KEEP_AWAKE: the line is already
-        // trimmed, so the argument is a clean "0" or "1".
-        const std::string arg = (firstSpace == std::string::npos)
-                                    ? ""
-                                    : line.substr(firstSpace + 1);
-        if (arg == "1") {
-            daemonstate::SetScreen(true);
-            daemonstate::WakePowerThread(); // apply immediately instead of waiting for the next poll
-            return "OK screen keep-awake enabled\n";
+
+        const bool enable = (state == "1");
+        if (keepAwake) {
+            daemonstate::SetManualTimed(enable, seconds);
+        } else {
+            daemonstate::SetScreenTimed(enable, seconds);
         }
-        if (arg == "0") {
-            daemonstate::SetScreen(false);
-            daemonstate::WakePowerThread();
-            return "OK screen keep-awake disabled\n";
+        daemonstate::WakePowerThread(); // apply immediately instead of waiting for the next poll
+
+        std::string response = "OK ";
+        response += keepAwake ? "keep-awake" : "screen keep-awake";
+        if (!enable) {
+            response += " disabled\n";
+        } else if (seconds > 0) {
+            response += " enabled for " + std::to_string(seconds) + " seconds\n";
+        } else {
+            response += " enabled\n";
         }
-        return "ERR SCREEN expects 0 or 1\n";
+        return response;
     }
     if (verb == "GET_STATUS") {
         return HandleGetStatus();

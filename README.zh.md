@@ -118,10 +118,13 @@ awake help              显示帮助信息。
 awake version           显示版本号。
 awake 0                 取消保持唤醒（恢复系统默认电源行为）。
 awake 1                 开启保持唤醒（阻止空闲睡眠和休眠）。
+awake 1 for <时长>      同上，但到时间自动解除（30m、1h30m、2h；单位 s/m/h/d）。
+awake 1 until <HH:MM>   同上，但在该时刻解除（若今天已过，则顺延到明天并给出警告）。
 awake status            显示综合状态：守护进程、保持唤醒、屏幕保持和监视列表
                         （不会启动守护进程；监视列表条目绿色表示正在运行，
                         红色表示未运行）。
 awake screen on         让屏幕保持常亮（阻止屏幕关闭、屏幕保护和空闲锁屏）。
+awake screen on for <时长>  同上，但到时间自动解除。
 awake screen off        停止让屏幕保持常亮。
 awake daemon on         启动后台守护进程。
 awake daemon off        停止后台守护进程。

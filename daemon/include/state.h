@@ -49,6 +49,26 @@ void SetManual(bool enabled);
 bool GetScreen();
 void SetScreen(bool enabled);
 
+// Timed variants (F1): seconds > 0 makes the daemon clear the flag by itself
+// when the period is over, seconds == 0 keeps it until it is cleared by hand.
+// SetManual()/SetScreen() are the "no expiry" shorthand.
+void SetManualTimed(bool enabled, unsigned int seconds);
+void SetScreenTimed(bool enabled, unsigned int seconds);
+
+// Remaining seconds of a timed keep-awake: -1 = no expiry, 0 = not set,
+// > 0 = seconds left. Read by GET_STATUS.
+int GetManualRemaining();
+int GetScreenRemaining();
+
+// Clears every flag whose deadline has passed. Returns true when something
+// changed, so the power thread knows the execution state has to be re-applied.
+bool ExpireTimers();
+
+// Milliseconds until the nearest expiry, or 0 when no timer is running.
+// The power thread uses it to wake up exactly when a timer runs out instead of
+// waiting for the next 30 second poll.
+unsigned long long MillisecondsUntilExpiry();
+
 // True while a watched application is currently running. Only the power
 // thread writes this (it owns the process scan results); the server thread
 // only reads it for GET_STATUS.

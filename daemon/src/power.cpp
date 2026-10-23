@@ -93,9 +93,25 @@ DWORD WINAPI PowerThreadProc(LPVOID /*param*/) {
     SetThreadExecutionState(ES_SYSTEM_REQUIRED);
 
     for (;;) {
+        // A timed keep-awake may have run out while we slept; clear it before
+        // applying the state so the release and the execution state update
+        // happen in the same pass.
+        daemonstate::ExpireTimers();
         ApplyDesiredState();
 
-        WaitForSingleObject(daemonstate::WakeEvent(), kPollIntervalMs);
+        // Sleep until the next poll, but wake up exactly when the nearest
+        // timed period ends, so an expiry is honoured within a second instead
+        // of waiting for the 30 second poll.
+        DWORD waitMs = kPollIntervalMs;
+        const unsigned long long untilExpiry = daemonstate::MillisecondsUntilExpiry();
+        if (untilExpiry > 0 && untilExpiry < waitMs) {
+            waitMs = static_cast<DWORD>(untilExpiry);
+        }
+        if (waitMs == 0) {
+            waitMs = 1; // a zero timeout would turn this loop into a spin
+        }
+
+        WaitForSingleObject(daemonstate::WakeEvent(), waitMs);
 
         if (daemonstate::GetExitRequested()) {
             break;

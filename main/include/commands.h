@@ -61,11 +61,13 @@ void PrintCommandSuggestions(const std::string& input, const char* scope = NULL)
 bool EnsureLicenseAccepted();
 
 // "awake 0" / "awake 1": disable/enable keep-awake via the daemon.
-// Returns the process exit code.
-int CmdSetKeepAwake(bool enable);
+// seconds > 0 enables it for a limited period (F1): the daemon then releases
+// the state by itself. Returns the process exit code.
+int CmdSetKeepAwake(bool enable, unsigned int seconds = 0);
 
-// "awake screen on" / "awake screen off": screen keep-awake via the daemon.
-int CmdSetScreenKeepAwake(bool enable);
+// "awake screen on" / "awake screen off": screen keep-awake via the daemon,
+// with the same optional period.
+int CmdSetScreenKeepAwake(bool enable, unsigned int seconds = 0);
 
 // "awake status": the single status view (daemon, keep-awake, screen and
 // watch list). Never starts the daemon.

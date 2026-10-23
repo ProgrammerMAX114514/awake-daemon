@@ -118,10 +118,15 @@ awake help              Show the help message.
 awake version           Show the version.
 awake 0                 Disable keep-awake (restore default power behavior).
 awake 1                 Enable keep-awake (block idle sleep and hibernation).
+awake 1 for <period>    Same, but released automatically after the period
+                        (30m, 1h30m, 2h; units s/m/h/d).
+awake 1 until <HH:MM>   Same, but released at that clock time (tomorrow when
+                        the time has already passed - a warning is printed).
 awake status            Show daemon, keep-awake, screen and watch list status
                         (never starts the daemon; watch list entries are green
                         when running, red when not).
 awake screen on         Keep the screen on (blocks screen off, screensaver and idle lock).
+awake screen on for <period>  Same, but released automatically after the period.
 awake screen off        Stop keeping the screen on.
 awake daemon on         Start the background daemon.
 awake daemon off        Stop the background daemon.
@@ -146,7 +151,8 @@ Two output details worth knowing:
 Notes:
 
 - `awake 0` and `awake 1` start the daemon automatically if it is not running.
-- The keep-awake state is kept in the daemon's memory only. After the daemon restarts it is inactive again.
+- The keep-awake state is kept in the daemon's memory only. After the daemon restarts it is inactive again - timed periods are not an exception: the daemon has no way to remember them.
+- A timed keep-awake is measured with a monotonic clock, so changing the system time or crossing a daylight saving boundary does not move the expiry point.
 - When the daemon starts it sends a one-shot stay-awake notification to the system (resets the idle timer once), regardless of the current setting.
 - The first run prints the Apache License 2.0 and asks for acceptance; `help` and `version` work without accepting. The answer is stored in `awake.ini`, so every file written by an older version asks once after the upgrade.
 - Running the client (or the daemon) from an elevated console prints a yellow warning: such a daemon cannot be controlled from a normal shell. `awake status` marks an elevated daemon with `(elevated)`.

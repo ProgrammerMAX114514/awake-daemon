@@ -40,6 +40,7 @@
 #include "ipc.h"
 #include "process.h"
 #include "protocol.h"
+#include "timeparse.h"
 
 // Queries GET_STATUS from the daemon and parses the response via the
 // shared protocol layer. Returns false when the daemon is not reachable.
@@ -97,11 +98,15 @@ int cli::CmdStatus() {
     } else {
         console::Printf(console::kColorReset, "Keep-awake: ");
         console::Printf(console::kColorGreen, "ENABLED");
-        // Explain why the daemon is currently blocking sleep.
+        // Explain why the daemon is currently blocking sleep. A timed period
+        // (F1) also shows how long it still runs.
+        const std::string expires = (info.manualRemaining > 0)
+            ? ", expires in " + timeparse::FormatDuration(static_cast<unsigned int>(info.manualRemaining))
+            : std::string();
         if (info.manual && info.app) {
-            console::Printf(console::kColorReset, " (manually set and a watched application is running)");
+            console::Printf(console::kColorReset, " (manually set and a watched application is running%s)", expires.c_str());
         } else if (info.manual) {
-            console::Printf(console::kColorReset, " (manually set)");
+            console::Printf(console::kColorReset, " (manually set%s)", expires.c_str());
         } else {
             console::Printf(console::kColorReset, " (a watched application is running)");
         }
@@ -111,8 +116,15 @@ int cli::CmdStatus() {
     if (info.screen) {
         console::Printf(console::kColorReset, "Screen:     ");
         console::Printf(console::kColorGreen, "ENABLED");
-        console::Printf(console::kColorReset,
-                        " (screen off, screensaver and idle lock are blocked).\n");
+        if (info.screenRemaining > 0) {
+            console::Printf(console::kColorReset,
+                            " (screen off, screensaver and idle lock are blocked; expires in %s).\n",
+                            timeparse::FormatDuration(
+                                static_cast<unsigned int>(info.screenRemaining)).c_str());
+        } else {
+            console::Printf(console::kColorReset,
+                            " (screen off, screensaver and idle lock are blocked).\n");
+        }
     } else {
         console::Printf(console::kColorReset, "Screen:     ");
         console::Printf(console::kColorYellow, "INACTIVE");

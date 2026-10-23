@@ -48,16 +48,88 @@
 #include <windows.h>
 
 #include <cstdio>
+#include <ctime>
 #include <string>
 
 #include "commands.h"
+#include "config.h"
 #include "console.h"
 #include "privilege.h"
+#include "timeparse.h"
 #include "version.h"
 
 // -----------------------------------------------------------------------------
 // Entry point
 // -----------------------------------------------------------------------------
+
+// Parses the optional "for <duration>" / "until <HH:MM>" tail of a command,
+// starting at argv[index]. On success seconds holds the period (0 = no
+// expiry) and the function returns true. A malformed tail is reported and
+// turns into a non-zero exit code, so nothing is sent to the daemon.
+static bool ParseExpiryArguments(int argc, char** argv, int index, unsigned int& seconds) {
+    seconds = 0;
+    if (index >= argc) {
+        return true; // no tail at all: keep-awake without an expiry
+    }
+
+    const std::string keyword = config::ToLowerAscii(argv[index]);
+    const int argumentsLeft = argc - index;
+
+    if (keyword == "for") {
+        if (argumentsLeft != 2) {
+            console::PrintLine(console::kColorRed,
+                               "Error: 'for' needs a period, e.g. 'for 30m', 'for 1h30m'.");
+            return false;
+        }
+        if (!timeparse::ParseDuration(argv[index + 1], seconds)) {
+            console::Printf(console::kColorRed,
+                            "Error: cannot read '%s' as a period. Use a number plus s/m/h/d, e.g. 30m, 2h, 1h30m.\n",
+                            argv[index + 1]);
+            return false;
+        }
+        return true;
+    }
+
+    if (keyword == "until") {
+        if (argumentsLeft != 2) {
+            console::PrintLine(console::kColorRed,
+                               "Error: 'until' needs a time, e.g. 'until 18:00'.");
+            return false;
+        }
+        // Convert the wall clock time to "seconds from now" here: the daemon
+        // only knows monotonic time, which keeps the expiry stable even if
+        // the clock is changed later.
+        const std::time_t now = std::time(NULL);
+        std::tm local;
+        if (localtime_s(&local, &now) != 0) {
+            console::PrintLine(console::kColorRed, "Error: cannot read the local time.");
+            return false;
+        }
+        const unsigned int nowToday = static_cast<unsigned int>(local.tm_hour) * 3600u +
+                                      static_cast<unsigned int>(local.tm_min) * 60u +
+                                      static_cast<unsigned int>(local.tm_sec);
+        bool rolledOver = false;
+        if (!timeparse::ParseUntil(argv[index + 1], nowToday, seconds, rolledOver)) {
+            console::Printf(console::kColorRed,
+                            "Error: cannot read '%s' as a time. Use the 24 hour form HH:MM, e.g. 18:00.\n",
+                            argv[index + 1]);
+            return false;
+        }
+        if (rolledOver) {
+            // The user almost certainly wants a keep-awake that ends today, so
+            // rolling into tomorrow is worth a warning rather than silence.
+            console::Printf(console::kColorYellow,
+                            "Warning: %s has already passed today; using tomorrow instead (%s from now).\n",
+                            argv[index + 1], timeparse::FormatDuration(seconds).c_str());
+        }
+        return true;
+    }
+
+    console::Printf(console::kColorRed,
+                    "Error: unexpected argument '%s' (expected 'for <period>' or 'until <HH:MM>').\n",
+                    argv[index]);
+    return false;
+}
 
 // Runs one command and returns its exit code. Kept separate from main() so
 // that the AI notice can be printed exactly once, after any command output.
@@ -109,7 +181,11 @@ static int RunCommand(int argc, char** argv) {
         return cli::CmdSetKeepAwake(false);
     }
     if (command == "1" || command == "on" || command == "enable" || command == "start") {
-        return cli::CmdSetKeepAwake(true);
+        unsigned int seconds = 0;
+        if (!ParseExpiryArguments(argc, argv, 2, seconds)) {
+            return 1;
+        }
+        return cli::CmdSetKeepAwake(true, seconds);
     }
     if (command == "status" || command == "st") {
         return cli::CmdStatus();
@@ -133,7 +209,13 @@ static int RunCommand(int argc, char** argv) {
             return 1;
         }
         const std::string sub = argv[2];
-        if (sub == "on" || sub == "1")  return cli::CmdSetScreenKeepAwake(true);
+        if (sub == "on" || sub == "1") {
+            unsigned int seconds = 0;
+            if (!ParseExpiryArguments(argc, argv, 3, seconds)) {
+                return 1;
+            }
+            return cli::CmdSetScreenKeepAwake(true, seconds);
+        }
         if (sub == "off" || sub == "0") return cli::CmdSetScreenKeepAwake(false);
         cli::PrintCommandSuggestions("screen " + sub, "screen");
         return 1;

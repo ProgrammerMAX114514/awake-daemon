@@ -13,6 +13,7 @@ add_executable(awake_tests
     main.cpp
     test_config.cpp
     test_protocol.cpp
+    test_timeparse.cpp
 )
 
 target_include_directories(awake_tests PRIVATE

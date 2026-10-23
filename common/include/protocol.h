@@ -60,10 +60,13 @@ std::string MakePingRequest();
 bool ParsePongResponse(const std::string& response, std::string& daemonVersion);
 
 // Builds the request line for "awake 0"/"awake 1" ("KEEP_AWAKE 0|1").
-std::string MakeKeepAwakeRequest(bool enable);
+// seconds > 0 asks the daemon to release the state by itself after that many
+// seconds ("KEEP_AWAKE 1 1800"); 0 means "until cleared by hand".
+std::string MakeKeepAwakeRequest(bool enable, unsigned int seconds = 0);
 
-// Builds the request line for "awake screen on/off" ("SCREEN 1|0").
-std::string MakeScreenRequest(bool enable);
+// Builds the request line for "awake screen on/off" ("SCREEN 1|0"), with the
+// same optional expiry as MakeKeepAwakeRequest.
+std::string MakeScreenRequest(bool enable, unsigned int seconds = 0);
 
 // -----------------------------------------------------------------------------
 // GET_STATUS payload
@@ -78,6 +81,10 @@ struct DaemonStatus {
     bool active = false;  // anything currently prevents idle sleep
     bool elevated = false; // daemon runs with an elevated token (new in 0.4.x)
     std::string version;  // daemon version (empty for older daemons)
+    // Remaining seconds of a timed keep-awake: -1 means "no expiry" (which is
+    // also what a daemon without timer support reports), 0 means "not set".
+    int manualRemaining = -1;
+    int screenRemaining = -1;
 };
 
 // Serializes a DaemonStatus into the GET_STATUS response body, starting
