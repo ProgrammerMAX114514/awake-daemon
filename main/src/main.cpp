@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
     }
     if (command == "daemon" || command == "d") {
         if (argc < 3) {
-            console::PrintLine(console::kColorRed, "Error: missing daemon subcommand (on, off, enable or disable).");
+            cli::PrintCommandSuggestions("daemon", "daemon");
             return 1;
         }
         const std::string sub = argv[2];
@@ -122,18 +122,18 @@ int main(int argc, char** argv) {
         if (sub == "off" || sub == "0" || sub == "stop")  return cli::CmdDaemonOff();
         if (sub == "enable")  return cli::CmdDaemonEnable();
         if (sub == "disable") return cli::CmdDaemonDisable();
-        console::Printf(console::kColorRed, "Error: unknown daemon subcommand '%s' (expected on/1/start, off/0/stop, enable or disable).\n", argv[2]);
+        cli::PrintCommandSuggestions("daemon " + sub, "daemon");
         return 1;
     }
     if (command == "screen" || command == "scr") {
         if (argc < 3) {
-            console::PrintLine(console::kColorRed, "Error: missing screen subcommand (on or off).");
+            cli::PrintCommandSuggestions("screen", "screen");
             return 1;
         }
         const std::string sub = argv[2];
         if (sub == "on" || sub == "1")  return cli::CmdSetScreenKeepAwake(true);
         if (sub == "off" || sub == "0") return cli::CmdSetScreenKeepAwake(false);
-        console::Printf(console::kColorRed, "Error: unknown screen subcommand '%s' (expected on/1 or off/0).\n", argv[2]);
+        cli::PrintCommandSuggestions("screen " + sub, "screen");
         return 1;
     }
     if (command == "reload") {
@@ -150,7 +150,16 @@ int main(int argc, char** argv) {
         return cli::CmdEditWatchList(argv[1], argv[2]);
     }
 
-    console::Printf(console::kColorRed, "Error: unknown command '%s'.\n", argv[1]);
-    console::PrintLine(console::kColorReset, "Run 'awake help' to see the available commands.");
+    // Unknown command: guess what the user meant instead of only rejecting it.
+    // All arguments are joined so that "awake scren of" can be matched against
+    // "screen off" as a whole.
+    std::string typedCommand;
+    for (int i = 1; i < argc; ++i) {
+        if (i > 1) {
+            typedCommand += ' ';
+        }
+        typedCommand += argv[i];
+    }
+    cli::PrintCommandSuggestions(typedCommand);
     return 1;
 }

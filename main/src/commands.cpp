@@ -25,9 +25,11 @@
 
 #include <windows.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include "autostart.h"
 #include "config.h"
@@ -66,26 +68,109 @@ const AliasRow kAliasRows[] = {
 
 const size_t kAliasRowCount = sizeof(kAliasRows) / sizeof(kAliasRows[0]);
 
+// One row of the command table: the canonical spelling (without the "awake "
+// prefix), a one-line description and whether the Usage block lists it.
+// Parents such as "daemon" are used for suggestions only; their leaf commands
+// are what the Usage block shows.
+struct CommandEntry {
+    const char* command;
+    const char* description;
+    bool inUsage;
+};
+
+const CommandEntry kCommandEntries[] = {
+    { "help",            "Show this help message.", true },
+    { "version",         "Show the version.", true },
+    { "aliases",         "Show every command alias (same as 'awake a').", true },
+    { "0",               "Disable keep-awake (restore default power behavior).", true },
+    { "1",               "Enable keep-awake (block idle sleep and hibernation).", true },
+    { "status",          "Show daemon, keep-awake, screen and watch list status.", true },
+    { "screen",          "Turn the screen keep-awake on or off (on / off).", false },
+    { "screen on",       "Keep the screen on (blocks screen off, screensaver and idle lock).", true },
+    { "screen off",      "Stop keeping the screen on.", true },
+    { "daemon",          "Start, stop or configure the daemon (on / off / enable / disable).", false },
+    { "daemon on",       "Start the background daemon.", true },
+    { "daemon off",      "Stop the background daemon.", true },
+    { "daemon enable",   "Start the daemon automatically at logon.", true },
+    { "daemon disable",  "Do not start the daemon automatically at logon.", true },
+    { "reload",          "Re-read the configuration file immediately.", true },
+    { "reset",           "Reset the configuration file (asks for confirmation).", true },
+    { "add <imagename>", "Add an image name to the watch list.", true },
+    { "del <imagename>", "Remove an image name from the watch list.", true },
+};
+
+const size_t kCommandEntryCount = sizeof(kCommandEntries) / sizeof(kCommandEntries[0]);
+
+// Commands whose command column is longer than this are not expected; the
+// column width below keeps every row on a single line.
+const int kCommandColumnWidth = 18;
+
+// Returns the spelling without the argument placeholder ("add <imagename>"
+// becomes "add"), so that suggestions compare command words only.
+std::string CommandWords(const char* command) {
+    std::string words(command);
+    const size_t placeholder = words.find(" <");
+    if (placeholder != std::string::npos) {
+        words.erase(placeholder);
+    }
+    return words;
+}
+
+// Classic Levenshtein distance; the inputs are short command lines.
+size_t EditDistance(const std::string& left, const std::string& right) {
+    const size_t leftSize = left.size();
+    const size_t rightSize = right.size();
+    std::vector<size_t> previous(rightSize + 1);
+    std::vector<size_t> current(rightSize + 1);
+    for (size_t j = 0; j <= rightSize; ++j) {
+        previous[j] = j;
+    }
+    for (size_t i = 1; i <= leftSize; ++i) {
+        current[0] = i;
+        for (size_t j = 1; j <= rightSize; ++j) {
+            const size_t cost = (left[i - 1] == right[j - 1]) ? 0 : 1;
+            size_t best = previous[j] + 1;                 // deletion
+            if (current[j - 1] + 1 < best) {               // insertion
+                best = current[j - 1] + 1;
+            }
+            if (previous[j - 1] + cost < best) {           // substitution
+                best = previous[j - 1] + cost;
+            }
+            current[j] = best;
+        }
+        previous.swap(current);
+    }
+    return previous[rightSize];
+}
+
+// How many typos are tolerated for a command of the given length. Short
+// commands are easy to confuse with unrelated words, so they allow fewer.
+size_t AllowedDistance(size_t length) {
+    if (length <= 3) {
+        return 1;
+    }
+    if (length <= 6) {
+        return 2;
+    }
+    return 3;
+}
+
+void PrintCommandRow(const char* command, const char* description) {
+    char column[64] = { 0 };
+    std::snprintf(column, sizeof(column), "awake %s", command);
+    console::Printf(console::kColorReset, "  %-*s %s\n", kCommandColumnWidth + 6, column, description);
+}
+
 // "awake" without arguments and as a hint after unknown commands.
 void cli::PrintHelp() {
     console::Printf(console::kColorCyan, "awake %s - keep the system awake\n", version::kVersion);
     console::PrintLine(console::kColorReset, "");
     console::PrintLine(console::kColorReset, "Usage:");
-    console::Printf(console::kColorReset,   "  awake help              %sShow this help message.\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake 0                 %sDisable keep-awake (restore default power behavior).\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake 1                 %sEnable keep-awake (block idle sleep and hibernation).\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake status            %sShow daemon, keep-awake, screen and watch list status.\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake screen on         %sKeep the screen on (blocks screen off, screensaver and idle lock).\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake screen off        %sStop keeping the screen on.\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake daemon on         %sStart the background daemon.\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake daemon off        %sStop the background daemon.\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake daemon enable     %sStart the daemon automatically at logon.\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake daemon disable    %sDo not start the daemon automatically at logon.\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake reload            %sRe-read the configuration file immediately.\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake reset             %sReset the configuration file (asks for confirmation).\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake add <imagename>   %sAdd an image name to the watch list.\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake del <imagename>   %sRemove an image name from the watch list.\n", console::kColorReset);
-    console::Printf(console::kColorReset,   "  awake aliases           %sShow every command alias (same as 'awake a').\n", console::kColorReset);
+    for (size_t i = 0; i < kCommandEntryCount; ++i) {
+        if (kCommandEntries[i].inUsage) {
+            PrintCommandRow(kCommandEntries[i].command, kCommandEntries[i].description);
+        }
+    }
     console::PrintLine(console::kColorReset, "");
     console::PrintLine(console::kColorReset, "Command aliases:");
     cli::PrintAliasTable();
@@ -121,6 +206,77 @@ int cli::CmdAliases() {
     console::PrintLine(console::kColorReset, "Commands that are not listed accept no alias.");
     console::PrintLine(console::kColorReset, "Run 'awake help' for the full usage.");
     return 0;
+}
+
+// "Did you mean" output for an input that did not dispatch. Nothing is
+// executed: the block only names the closest commands and explains them.
+// scope is empty at the top level, or the parent command ("daemon"/"screen")
+// whose subcommands are being completed.
+void cli::PrintCommandSuggestions(const std::string& input, const char* scope) {
+    const std::string typed = config::TrimText(config::ToLowerAscii(input));
+    const std::string scopeText = (scope != NULL) ? std::string(scope) : std::string();
+
+    // Missing subcommand: list everything that belongs to the parent.
+    if (!scopeText.empty() && typed == scopeText) {
+        console::Printf(console::kColorRed, "Error: 'awake %s' needs a subcommand.\n", scopeText.c_str());
+        console::PrintLine(console::kColorReset, "Available subcommands:");
+        for (size_t i = 0; i < kCommandEntryCount; ++i) {
+            const std::string command(kCommandEntries[i].command);
+            if (command.size() > scopeText.size() + 1 &&
+                command.compare(0, scopeText.size() + 1, scopeText + " ") == 0) {
+                PrintCommandRow(kCommandEntries[i].command, kCommandEntries[i].description);
+            }
+        }
+        console::PrintLine(console::kColorReset, "");
+        console::PrintLine(console::kColorReset, "Run 'awake help' to see the complete command list.");
+        return;
+    }
+
+    // Typo: rank the command table by edit distance and keep the closest few.
+    struct Match {
+        size_t distance;
+        size_t index;
+    };
+    std::vector<Match> matches;
+    for (size_t i = 0; i < kCommandEntryCount; ++i) {
+        const std::string words = CommandWords(kCommandEntries[i].command);
+        if (!scopeText.empty()) {
+            // Only the subcommands of the given parent are candidates; the
+            // parent itself is not suggested back to the user.
+            if (words == scopeText ||
+                words.compare(0, scopeText.size() + 1, scopeText + " ") != 0) {
+                continue;
+            }
+        }
+        const size_t distance = EditDistance(typed, words);
+        const size_t smallest = (words.size() < typed.size()) ? words.size() : typed.size();
+        if (distance <= AllowedDistance(smallest)) {
+            Match match = { distance, i };
+            matches.push_back(match);
+        }
+    }
+    std::sort(matches.begin(), matches.end(), [](const Match& left, const Match& right) {
+        if (left.distance != right.distance) {
+            return left.distance < right.distance;
+        }
+        return left.index < right.index;
+    });
+    if (matches.size() > 3) {
+        matches.resize(3);
+    }
+
+    console::Printf(console::kColorRed, "Error: unknown command 'awake %s'.\n", typed.c_str());
+    if (matches.empty()) {
+        console::PrintLine(console::kColorReset, "Run 'awake help' to see the available commands.");
+        return;
+    }
+    console::PrintLine(console::kColorReset, "Did you mean:");
+    for (size_t i = 0; i < matches.size(); ++i) {
+        const CommandEntry& entry = kCommandEntries[matches[i].index];
+        PrintCommandRow(entry.command, entry.description);
+    }
+    console::PrintLine(console::kColorReset, "");
+    console::PrintLine(console::kColorReset, "Run 'awake help' to see the complete command list.");
 }
 
 // -----------------------------------------------------------------------------

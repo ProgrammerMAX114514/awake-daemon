@@ -85,6 +85,7 @@ It exercises every command (including aliases and the autostart registry entry),
 
 ```
 awake help              Show the help message.
+awake version           Show the version.
 awake 0                 Disable keep-awake (restore default power behavior).
 awake 1                 Enable keep-awake (block idle sleep and hibernation).
 awake status            Show daemon, keep-awake, screen and watch list status

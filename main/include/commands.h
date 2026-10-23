@@ -47,6 +47,12 @@ void PrintAliasTable();
 // together with its aliases. Documentation only, no side effects.
 int CmdAliases();
 
+// Prints the "unknown command" error together with the closest commands and
+// their descriptions; nothing is executed. input is the full command text
+// without the leading "awake". scope is NULL at the top level, or the parent
+// command ("daemon"/"screen") when a subcommand was misspelled or missing.
+void PrintCommandSuggestions(const std::string& input, const char* scope = NULL);
+
 // First-run license gate. When the configuration file does not record an
 // accepted license, the full Apache License 2.0 text is printed, the user
 // is asked for confirmation and the answer is stored in awake.ini.

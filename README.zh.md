@@ -85,6 +85,7 @@ python utils\test\smoketest.py
 
 ```
 awake help              显示帮助信息。
+awake version           显示版本号。
 awake 0                 取消保持唤醒（恢复系统默认电源行为）。
 awake 1                 开启保持唤醒（阻止空闲睡眠和休眠）。
 awake status            显示综合状态：守护进程、保持唤醒、屏幕保持和监视列表

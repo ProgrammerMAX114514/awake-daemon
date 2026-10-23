@@ -280,6 +280,32 @@ def test_version_and_help(cfg):
           code == 1 and "unknown command" in out.lower())
 
 
+def test_command_suggestions(cfg):
+    """Misspelled input gets a 'did you mean' block instead of only an error."""
+    code, out = run_client(cfg, ["stauts"])
+    check("typo suggests the closest command",
+          code == 1 and "Did you mean" in out and "awake status" in out, out.strip()[-200:])
+    check("suggestion carries the command description",
+          "watch list status" in out, out.strip()[-200:])
+
+    code, out = run_client(cfg, ["scren", "of"])
+    check("typo over two words suggests the subcommand",
+          code == 1 and "awake screen off" in out, out.strip()[-200:])
+
+    code, out = run_client(cfg, ["daemon"])
+    check("missing subcommand lists the available ones",
+          code == 1 and "needs a subcommand" in out and "awake daemon enable" in out,
+          out.strip()[-200:])
+
+    code, out = run_client(cfg, ["daemon", "onn"])
+    check("misspelled subcommand suggests the right one",
+          code == 1 and "awake daemon on" in out, out.strip()[-200:])
+
+    code, out = run_client(cfg, ["xyzzy"])
+    check("nonsense input gets no invented suggestion",
+          code == 1 and "Did you mean" not in out and "awake help" in out, out.strip()[-200:])
+
+
 def test_status_without_daemon(cfg):
     # The daemon is expected to be stopped here (the script stops it first).
     code, out = run_client(cfg, ["status"])
@@ -515,6 +541,7 @@ def main():
 
     test_license_gate(cfg)
     test_version_and_help(cfg)
+    test_command_suggestions(cfg)
     test_status_without_daemon(cfg)
     test_daemon_lifecycle(cfg)
     test_version_handshake(cfg)
