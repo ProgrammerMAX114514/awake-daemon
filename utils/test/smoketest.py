@@ -335,6 +335,26 @@ def test_command_suggestions(cfg):
           code == 1 and "Did you mean" not in out and "awake help" in out, out.strip()[-200:])
 
 
+def test_version_banner_and_notice(cfg):
+    """F20 (git commit in the banner) and F21 (AI reminder on stderr)."""
+    code, out = run_client(cfg, ["version"])
+    check("version banner carries the git commit",
+          code == 0 and re.search(r"\(git [0-9a-f]{7,}(-dirty)?\)", out) is not None,
+          out.strip())
+    check("the reminder stays out of non-interactive output",
+          "AI-generated software" not in out, out.strip())
+
+    env = dict(os.environ, AWAKE_AI_NOTICE="always")
+    result = subprocess.run(
+        [cfg["client_path"], "version"],
+        capture_output=True, text=True, env=env, timeout=cfg["command_timeout_s"],
+    )
+    check("AWAKE_AI_NOTICE=always prints the reminder",
+          "AI-generated software" in (result.stderr or ""), (result.stderr or "").strip())
+    check("the reminder never pollutes standard output",
+          "AI-generated software" not in (result.stdout or ""), (result.stdout or "").strip())
+
+
 def test_status_without_daemon(cfg):
     # The daemon is expected to be stopped here (the script stops it first).
     code, out = run_client(cfg, ["status"])
@@ -573,6 +593,7 @@ def main():
     test_license_gate(cfg)
     test_version_and_help(cfg)
     test_version_is_single_source(cfg)
+    test_version_banner_and_notice(cfg)
     test_command_suggestions(cfg)
     test_status_without_daemon(cfg)
     test_daemon_lifecycle(cfg)

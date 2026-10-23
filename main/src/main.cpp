@@ -59,7 +59,9 @@
 // Entry point
 // -----------------------------------------------------------------------------
 
-int main(int argc, char** argv) {
+// Runs one command and returns its exit code. Kept separate from main() so
+// that the AI notice can be printed exactly once, after any command output.
+static int RunCommand(int argc, char** argv) {
     console::EnableColors();
 
     // Warn when the client itself runs with administrator rights. A daemon
@@ -92,7 +94,7 @@ int main(int argc, char** argv) {
     }
 
     if (command == "version") {
-        console::Printf(console::kColorCyan, "awake %s\n", version::kVersion);
+        console::Printf(console::kColorCyan, "awake %s\n", version::kVersionDisplay);
         return 0;
     }
     if (command == "help" || command == "?" || command == "h" ||
@@ -162,4 +164,13 @@ int main(int argc, char** argv) {
     }
     cli::PrintCommandSuggestions(typedCommand);
     return 1;
+}
+
+// Every command ends with the same one-line reminder. It goes to stderr and
+// only shows on an interactive terminal, so redirecting or piping the output
+// (and any future machine-readable mode) stays clean.
+int main(int argc, char** argv) {
+    const int exitCode = RunCommand(argc, argv);
+    console::PrintAiNotice();
+    return exitCode;
 }

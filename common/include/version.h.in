@@ -43,6 +43,15 @@ const char* const kSuffix = "@AWAKE_VERSION_SUFFIX@";
 // Full version string, assembled by CMake, e.g. "0.6.0-beta".
 const char* const kVersion = "@AWAKE_VERSION_FULL@";
 
+// Short git commit this binary was built from ("unknown" outside a checkout,
+// suffixed with "-dirty" when the tree had uncommitted changes).
+const char* const kGitCommit = "@AWAKE_GIT_COMMIT@";
+
+// User-facing version banner, e.g. "0.6.0-beta (git 3e548a6)". Only for
+// display: the protocol and the version comparison use kVersion, so a daemon
+// and a client from the same release always match.
+const char* const kVersionDisplay = "@AWAKE_VERSION_DISPLAY@";
+
 } // namespace version
 
 #endif // AWAKE_VERSION_H

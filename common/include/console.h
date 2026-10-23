@@ -52,6 +52,18 @@ void PrintLine(const char* color, const char* text);
 // Implemented with vprintf, so the usual format specifiers apply.
 void Printf(const char* color, const char* fmt, ...);
 
+// Prints the one-line reminder that the program was generated with AI
+// assistance. It goes to stderr so pipes, scripts and future machine-readable
+// output are never affected, and it is only shown on an interactive terminal
+// unless the AWAKE_AI_NOTICE environment variable forces it:
+//   AWAKE_AI_NOTICE=always  print even when stderr is redirected
+//   AWAKE_AI_NOTICE=never   suppress it unconditionally
+void PrintAiNotice();
+
+// Marks the reminder as already delivered during this run. Used by the
+// license prompt, which ends with the same statement.
+void SuppressAiNotice();
+
 } // namespace console
 
 #endif // AWAKE_CONSOLE_H

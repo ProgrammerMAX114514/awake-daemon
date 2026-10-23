@@ -130,6 +130,11 @@ Command aliases: `awake ?` and `awake h` are equivalent to `awake help`; `awake 
 
 `awake aliases` prints the same mapping as an aligned table at any time (the help message shows it in its own "Command aliases" section).
 
+Two output details worth knowing:
+
+- the version banner names the build it came from, e.g. `awake 0.6.0-beta (git 3e548a6)`. A `-dirty` suffix marks a build made from uncommitted changes, and a build outside a git checkout reports the version alone.
+- every interactive run ends with a one-line AI-generated-software reminder written to **stderr**. Redirecting or piping the output therefore stays clean, and `AWAKE_AI_NOTICE=always` / `=never` overrides the automatic decision.
+
 Notes:
 
 - `awake 0` and `awake 1` start the daemon automatically if it is not running.

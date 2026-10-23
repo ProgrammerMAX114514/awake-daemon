@@ -163,7 +163,7 @@ void PrintCommandRow(const char* command, const char* description) {
 
 // "awake" without arguments and as a hint after unknown commands.
 void cli::PrintHelp() {
-    console::Printf(console::kColorCyan, "awake %s - keep the system awake\n", version::kVersion);
+    console::Printf(console::kColorCyan, "awake %s - keep the system awake\n", version::kVersionDisplay);
     console::PrintLine(console::kColorReset, "");
     console::PrintLine(console::kColorReset, "Usage:");
     for (size_t i = 0; i < kCommandEntryCount; ++i) {
@@ -199,7 +199,7 @@ void cli::PrintAliasTable() {
 
 // "awake aliases": documentation command, no side effects.
 int cli::CmdAliases() {
-    console::Printf(console::kColorCyan, "awake %s - command aliases\n", version::kVersion);
+    console::Printf(console::kColorCyan, "awake %s - command aliases\n", version::kVersionDisplay);
     console::PrintLine(console::kColorReset, "");
     cli::PrintAliasTable();
     console::PrintLine(console::kColorReset, "");
@@ -413,6 +413,18 @@ bool cli::EnsureLicenseAccepted() {
     console::PrintLine(console::kColorCyan, "awake first run - license agreement");
     console::PrintLine(console::kColorReset, "");
     console::Printf(console::kColorReset, "%s\n", license::kText);
+    // The AI statement belongs to the license block (F21): a user who reads
+    // the terms also reads what kind of software it is. The generic reminder
+    // at the end of a command is suppressed for this run, so it is not
+    // printed twice.
+    console::PrintLine(console::kColorReset, "");
+    console::PrintLine(console::kColorYellow,
+                       "AI-GENERATED SOFTWARE: this program was generated with AI assistance.");
+    console::PrintLine(console::kColorYellow,
+                       "Review the source code carefully before relying on it; the author is not");
+    console::PrintLine(console::kColorYellow,
+                       "responsible or liable for any consequences arising from its use.");
+    console::SuppressAiNotice();
     console::PrintLine(console::kColorReset, "");
     console::Printf(console::kColorReset, "Official license page: %s\n", license::kUrl);
     console::PrintLine(console::kColorReset, "");

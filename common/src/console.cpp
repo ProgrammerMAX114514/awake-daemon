@@ -25,8 +25,13 @@
 #include <windows.h>
 #include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
+#include <io.h>
 
 namespace console {
+
+// Set once the reminder has been shown (or is not wanted any more).
+static bool g_aiNoticeSuppressed = false;
 
 const char* const kColorReset = "\x1b[0m";
 const char* const kColorRed   = "\x1b[31m";
@@ -62,6 +67,36 @@ void Printf(const char* color, const char* fmt, ...) {
     std::vprintf(fmt, args);
     std::printf("%s", kColorReset);
     va_end(args);
+}
+
+void SuppressAiNotice() {
+    g_aiNoticeSuppressed = true;
+}
+
+void PrintAiNotice() {
+    if (g_aiNoticeSuppressed) {
+        return;
+    }
+    // AWAKE_AI_NOTICE overrides the automatic decision; the default is to
+    // show the line only when a human is actually looking at the terminal.
+    const char* mode = std::getenv("AWAKE_AI_NOTICE");
+    bool show = true;
+    if (mode != NULL && _stricmp(mode, "always") == 0) {
+        show = true;
+    } else if (mode != NULL && _stricmp(mode, "never") == 0) {
+        show = false;
+    } else {
+        show = (_isatty(_fileno(stderr)) != 0);
+    }
+    if (!show) {
+        return;
+    }
+
+    // stderr, not stdout: a redirected stdout (pipes, redirects, the future
+    // --json mode) must stay machine-readable.
+    const bool plain = (std::getenv("NO_COLOR") != NULL);
+    std::fprintf(stderr, "%sAI-generated software: review before use.%s\n",
+                 plain ? "" : kColorYellow, plain ? "" : kColorReset);
 }
 
 } // namespace console

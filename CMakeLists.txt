@@ -38,6 +38,40 @@ project(awake VERSION 0.6.0 LANGUAGES CXX)
 #   Pre-release:     "-beta", "-rc1", ...
 set(AWAKE_VERSION_SUFFIX "-beta")
 set(AWAKE_VERSION_FULL "${PROJECT_VERSION}${AWAKE_VERSION_SUFFIX}")
+
+# The commit hash is shown in the version banner (F20). Reconfiguring happens
+# on every build (utils/build.ps1 always runs the configure step), so the hash
+# follows new commits without a manual clean. Source exports and CI archives
+# without a .git directory fall back to "unknown".
+set(AWAKE_GIT_COMMIT "unknown")
+find_package(Git QUIET)
+if(GIT_FOUND)
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        OUTPUT_VARIABLE AWAKE_GIT_HASH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE AWAKE_GIT_RESULT)
+    if(AWAKE_GIT_RESULT EQUAL 0 AND AWAKE_GIT_HASH)
+        set(AWAKE_GIT_COMMIT "${AWAKE_GIT_HASH}")
+        # "-dirty" marks a binary built from uncommitted changes.
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} diff-index --quiet HEAD --
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            RESULT_VARIABLE AWAKE_GIT_DIRTY)
+        if(NOT AWAKE_GIT_DIRTY EQUAL 0)
+            set(AWAKE_GIT_COMMIT "${AWAKE_GIT_COMMIT}-dirty")
+        endif()
+    endif()
+endif()
+
+if(AWAKE_GIT_COMMIT STREQUAL "unknown")
+    set(AWAKE_VERSION_DISPLAY "${AWAKE_VERSION_FULL}")
+else()
+    set(AWAKE_VERSION_DISPLAY "${AWAKE_VERSION_FULL} (git ${AWAKE_GIT_COMMIT})")
+endif()
+
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/common/include/version.h.in
     ${CMAKE_CURRENT_BINARY_DIR}/generated/include/version.h

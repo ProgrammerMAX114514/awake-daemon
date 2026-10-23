@@ -54,19 +54,30 @@ Write-Host "[build] Generator: $generator"
 
 Push-Location $root
 try {
-    $useNMake = $false
+    $useNMake = ($generator -eq 'NMake Makefiles')
 
-    if ($generator -eq 'NMake Makefiles') {
-        $useNMake = $true
-    } else {
+    if (-not $useNMake) {
         Write-Host '[build] Configuring with CMake...'
         & $cmake -S . -B build -G $generator -A $platform
         if ($LASTEXITCODE -ne 0) {
-            if ($NoFallback) {
-                throw "CMake configuration failed with the '$generator' generator."
-            }
-            Write-Host '[build] That generator is unavailable, falling back to NMake...'
             $useNMake = $true
+        } else {
+            Write-Host '[build] Building (Release)...'
+            & $cmake --build build --config Release
+            if ($LASTEXITCODE -ne 0) {
+                # MSBuild can fail even after a successful configuration: for
+                # example when the inherited environment carries the same
+                # variable in two spellings (HTTPS_PROXY / https_proxy), which
+                # its process launcher rejects. NMake does not care.
+                Write-Host '[build] MSBuild failed.'
+                $useNMake = $true
+            }
+        }
+        if ($useNMake) {
+            if ($NoFallback) {
+                throw "Building with the '$generator' generator failed."
+            }
+            Write-Host '[build] Falling back to the NMake generator...'
         }
     }
 
@@ -87,10 +98,6 @@ try {
         }
         Copy-Item 'build\nmake\awake.exe' 'build\Release\' -Force
         Copy-Item 'build\nmake\awake.daemon.exe' 'build\Release\' -Force
-    } else {
-        Write-Host '[build] Building (Release)...'
-        & $cmake --build build --config Release
-        if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     }
 
     Write-Host '[build] Verifying the executables...'

@@ -130,6 +130,11 @@ awake aliases           显示所有命令别名（也可写作 awake a / awake 
 
 `awake aliases` 随时以下表形式输出同一份映射；帮助信息中它作为独立的「Command aliases」小节显示。
 
+两个输出细节值得注意：
+
+- 版本横幅会带上构建来源，例如 `awake 0.6.0-beta (git 3e548a6)`；带 `-dirty` 表示构建时有未提交改动，非 git 环境下只显示版本号。
+- 每次交互式运行的末尾会在 **stderr** 输出一行「AI 生成」提醒。因此重定向或管道输出保持干净；可用 `AWAKE_AI_NOTICE=always` / `=never` 覆盖这一自动判断。
+
 说明：
 
 - `awake 0` 和 `awake 1` 在守护进程未运行时会自动启动它。
