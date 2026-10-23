@@ -28,7 +28,7 @@
 # pipe IPC and process enumeration helpers.
 # =============================================================================
 cmake_minimum_required(VERSION 3.15)
-project(awake VERSION 0.6.0 LANGUAGES CXX)
+project(awake VERSION 0.7.0 LANGUAGES CXX)
 
 # The version number lives in exactly one place: the project() call above.
 # version.h is generated from common/include/version.h.in during configuration,
