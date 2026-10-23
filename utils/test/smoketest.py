@@ -99,6 +99,36 @@ def run_client(cfg, args, stdin_text=None):
     return result.returncode, (result.stdout or "") + (result.stderr or "")
 
 
+ANSI_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def strip_ansi(text):
+    """Removes ANSI color sequences so line based checks see plain text.
+
+    The client always writes the escape codes (EnableColors only affects
+    whether the terminal interprets them), so a captured line starts with
+    "\x1b[0m" and never matches a bare "Keep-awake:" prefix."""
+    return ANSI_PATTERN.sub("", text)
+
+
+def wait_for_status_line(cfg, label, expected, timeout_s=10):
+    """Polls "awake status" until the line starting with label contains
+    expected. Returns (ok, last_seen_line) - used for timed keep-awake, where
+    the daemon releases the state on its own a moment later."""
+    last = ""
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        code, out = run_client(cfg, ["status"])
+        plain = strip_ansi(out)
+        lines = [line for line in plain.splitlines() if line.startswith(label)]
+        if lines:
+            last = lines[0]
+            if expected in last:
+                return True, last
+        time.sleep(1)
+    return False, last
+
+
 def check(name, condition, detail=""):
     """Records and prints one test verdict."""
     global PASS, FAIL
@@ -472,20 +502,16 @@ def test_timed_keep_awake(cfg):
     check("status shows the remaining time",
           code == 0 and "expires in" in out, out.strip())
 
-    time.sleep(4)  # the daemon releases it on its own within ~1 s
-    code, out = run_client(cfg, ["status"])
-    keep_awake_line = [l for l in out.splitlines() if l.startswith("Keep-awake:")]
-    check("the keep-awake is released when the period ends",
-          code == 0 and keep_awake_line and "INACTIVE" in keep_awake_line[0], out.strip())
+    # The daemon releases the state on its own; poll instead of sleeping a
+    # fixed time so a slow runner cannot make this test flaky.
+    released, line = wait_for_status_line(cfg, "Keep-awake:", "INACTIVE")
+    check("the keep-awake is released when the period ends", released, line)
 
     code, out = run_client(cfg, ["screen", "on", "for", "2s"])
     check("'screen on for 2s' enables a timed screen keep-awake",
           code == 0 and "ENABLED for 2s" in out, out.strip())
-    time.sleep(4)
-    code, out = run_client(cfg, ["status"])
-    screen_line = [l for l in out.splitlines() if l.startswith("Screen:")]
-    check("the screen keep-awake is released when the period ends",
-          code == 0 and screen_line and "INACTIVE" in screen_line[0], out.strip())
+    released, line = wait_for_status_line(cfg, "Screen:", "INACTIVE")
+    check("the screen keep-awake is released when the period ends", released, line)
 
     code, out = run_client(cfg, ["1", "for", "30"])
     check("a period without a unit is rejected",
