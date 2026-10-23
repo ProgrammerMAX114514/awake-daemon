@@ -199,28 +199,55 @@ bool ReadAllLines(const std::string& path, std::vector<std::string>& lines) {
     return true;
 }
 
+// Writes content to the given path atomically: the text goes into a
+// temporary file next to the target, which is then swapped in. A daemon that
+// reads the file at the same time therefore sees either the old or the new
+// version, never a half-written one.
+bool WriteFileAtomic(const std::string& path, const std::string& content) {
+    const std::string tempPath = path + ".tmp";
+    {
+        std::ofstream file(tempPath.c_str(), std::ios::binary | std::ios::trunc);
+        if (!file.is_open()) {
+            return false;
+        }
+        file << content;
+        file.flush();
+        if (!file.good()) {
+            file.close();
+            DeleteFileA(tempPath.c_str());
+            return false;
+        }
+    }
+    // ReplaceFile keeps the attributes and ACLs of the original file.
+    if (ReplaceFileA(path.c_str(), tempPath.c_str(), NULL,
+                     REPLACEFILE_IGNORE_MERGE_ERRORS | REPLACEFILE_WRITE_THROUGH,
+                     NULL, NULL)) {
+        return true;
+    }
+    // ReplaceFile fails when the target does not exist yet (first write).
+    if (MoveFileExA(tempPath.c_str(), path.c_str(),
+                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        return true;
+    }
+    DeleteFileA(tempPath.c_str());
+    return false;
+}
+
 // Writes the initial template content to the given path, truncating any
 // existing file. Shared by EnsureConfigExists() and ResetConfig().
 bool WriteInitialConfig(const std::string& path) {
-    std::ofstream file(path.c_str(), std::ios::binary | std::ios::trunc);
-    if (!file.is_open()) {
-        return false;
-    }
-    file << kDefaultConfig;
-    return file.good();
+    return WriteFileAtomic(path, kDefaultConfig);
 }
 
 // Writes all lines back to the configuration file, always terminating the
 // last line with a newline so that later appends stay well-formed.
 bool WriteAllLines(const std::string& path, const std::vector<std::string>& lines) {
-    std::ofstream file(path.c_str(), std::ios::binary | std::ios::trunc);
-    if (!file.is_open()) {
-        return false;
-    }
+    std::string content;
     for (size_t i = 0; i < lines.size(); ++i) {
-        file << lines[i] << '\n';
+        content += lines[i];
+        content += '\n';
     }
-    return file.good();
+    return WriteFileAtomic(path, content);
 }
 
 } // namespace
