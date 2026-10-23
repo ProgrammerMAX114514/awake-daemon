@@ -44,7 +44,7 @@ welcome.
 - Use the conventional style already in the log: `feat:`, `fix:`,
   `refactor:`, `docs:`, `chore:`, `test:`.
 - Every pull request must pass the smoke test locally; include the test
-  summary (e.g. "43 passed, 0 failed") in the description.
+  summary (e.g. "69 passed, 0 failed") in the description.
 - Changes to the wire protocol must be made in `common/include/protocol.h`
   (single source of truth) and keep older clients working where possible -
   `ParseStatusResponse` ignores unknown KEY=VALUE lines on purpose.

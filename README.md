@@ -17,6 +17,16 @@ Current version: **0.6.0-beta**
 - **awake.exe** - the client command line tool.
 - **awake.daemon.exe** - the background daemon. It is started by the client and cannot be launched directly.
 
+## Download
+
+Prebuilt packages are attached to the [latest release](https://github.com/ProgrammerMAX114514/awake-daemon/releases/latest):
+
+```
+awake-daemon.win64.zip   awake.exe, awake.daemon.exe, LICENSE, NOTICE
+```
+
+Every release tag is GPG-signed; the release notes list the highlights, the behaviour changes and the full command list. Extract the zip into any folder - both executables are statically linked and need no runtime or installer. Building from source is described below.
+
 ## Features
 
 - **Keep-awake** (`awake 1`): blocks *idle* sleep and hibernation only. Manual sleep via the power button, the Start menu, or sleep commands issued by other applications still works normally.

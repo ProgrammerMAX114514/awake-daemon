@@ -7,8 +7,8 @@ beta; older beta tags are not supported.
 
 | Version    | Supported |
 |------------|-----------|
-| 0.3.0-beta | yes       |
-| < 0.3.0    | no        |
+| 0.6.0-beta | yes       |
+| < 0.6.0    | no        |
 
 ## Reporting a vulnerability
 

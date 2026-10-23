@@ -17,6 +17,16 @@
 - **awake.exe** - 客户端命令行工具。
 - **awake.daemon.exe** - 后台守护进程，由客户端启动，不能直接调用。
 
+## 下载
+
+预编译包挂在[最新 Release](https://github.com/ProgrammerMAX114514/awake-daemon/releases/latest)下：
+
+```
+awake-daemon.win64.zip   awake.exe、awake.daemon.exe、LICENSE、NOTICE
+```
+
+每个发布 tag 都有 GPG 签名；Release 说明里列出了亮点、行为变更与完整命令表。解压到任意目录即可使用——两个可执行文件均静态链接，无需运行时或安装器。从源码构建见下文。
+
 ## 功能特性
 
 - **保持唤醒**（`awake 1`）：只阻止*空闲*自动睡眠和休眠。电源按钮、开始菜单以及其他应用程序发起的手动睡眠指令不受影响，正常生效。
