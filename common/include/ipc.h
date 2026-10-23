@@ -67,11 +67,14 @@ bool IsDaemonRunning();
 
 // Starts the daemon as a detached background process. The daemon
 // executable is looked up next to the client executable. Returns false when
-// the process could not be created.
-bool StartDaemon();
+// the process could not be created; errorOut (optional) then receives the
+// Win32 error code so that the caller can explain what went wrong.
+bool StartDaemon(unsigned long* errorOut = NULL);
 
 // Polls the daemon with PING requests until it answers or the timeout
 // (in milliseconds) elapses. Returns true once the daemon is reachable.
+// The first probes are short so that a healthy start is detected quickly;
+// the interval grows afterwards to keep the CPU load negligible.
 bool WaitForDaemon(unsigned int timeoutMs);
 
 // Server side helper: reads one request line from a connected pipe instance

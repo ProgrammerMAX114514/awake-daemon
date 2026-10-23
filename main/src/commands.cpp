@@ -129,6 +129,32 @@ bool cli::CheckDaemonVersion(const std::string& daemonVersion) {
 // Daemon management helpers
 // -----------------------------------------------------------------------------
 
+// Explains a failed CreateProcess for the daemon in terms the user can act
+// on, instead of a generic "failed to start".
+static void PrintStartDaemonError(unsigned long errorCode) {
+    console::Printf(console::kColorRed, "Error: failed to start '%s' (Win32 error %lu).\n",
+                    ipc::kDaemonExeName, errorCode);
+    switch (errorCode) {
+        case 2: // ERROR_FILE_NOT_FOUND
+            console::PrintLine(console::kColorReset,
+                               "  The daemon executable was not found next to the client; both files must be in the same folder.");
+            break;
+        case 5: // ERROR_ACCESS_DENIED
+            console::PrintLine(console::kColorReset,
+                               "  Access denied. A daemon that was started as administrator cannot be controlled from a normal shell; check 'awake status'.");
+            break;
+        case 193: // ERROR_BAD_EXE_FORMAT
+        case 216: // ERROR_EXE_MACHINE_TYPE_MISMATCH
+            console::PrintLine(console::kColorReset,
+                               "  The daemon executable is not a valid binary for this system.");
+            break;
+        default:
+            console::PrintLine(console::kColorReset,
+                               "  The process could not be created; check the folder permissions.");
+            break;
+    }
+}
+
 // Makes sure the daemon is running, starting it if necessary, and verifies
 // the version handshake. Only used by the commands that must talk to the
 // daemon (0, 1, screen on/off).
@@ -136,8 +162,9 @@ static bool EnsureDaemonRunning() {
     std::string daemonVersion;
     if (!ipc::PingDaemon(daemonVersion)) {
         console::PrintLine(console::kColorYellow, "Daemon is not running. Starting daemon...");
-        if (!ipc::StartDaemon()) {
-            console::Printf(console::kColorRed, "Error: failed to start '%s'.\n", ipc::kDaemonExeName);
+        unsigned long startError = 0;
+        if (!ipc::StartDaemon(&startError)) {
+            PrintStartDaemonError(startError);
             return false;
         }
         if (!ipc::WaitForDaemon(5000)) {
@@ -273,8 +300,9 @@ int cli::CmdDaemonOn() {
         console::PrintLine(console::kColorRed, "Error: cannot create the configuration file (awake.ini).");
         return 1;
     }
-    if (!ipc::StartDaemon()) {
-        console::Printf(console::kColorRed, "Error: failed to start '%s'.\n", ipc::kDaemonExeName);
+    unsigned long startError = 0;
+    if (!ipc::StartDaemon(&startError)) {
+        PrintStartDaemonError(startError);
         return 1;
     }
     if (!ipc::WaitForDaemon(5000)) {

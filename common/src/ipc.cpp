@@ -111,7 +111,10 @@ bool IsDaemonRunning() {
     return PingDaemon(daemonVersion);
 }
 
-bool StartDaemon() {
+bool StartDaemon(unsigned long* errorOut) {
+    if (errorOut != NULL) {
+        *errorOut = 0;
+    }
     // The daemon is expected to sit next to the client executable.
     const std::string exePath = config::GetExeDirectory() + "\\" + kDaemonExeName;
 
@@ -138,6 +141,9 @@ bool StartDaemon() {
                                         &startupInfo,
                                         &processInfo);
     if (!created) {
+        if (errorOut != NULL) {
+            *errorOut = GetLastError();
+        }
         return false;
     }
     // The daemon runs on its own from now on; drop our references.
@@ -147,8 +153,14 @@ bool StartDaemon() {
 }
 
 bool WaitForDaemon(unsigned int timeoutMs) {
-    const unsigned int attemptIntervalMs = 250;
+    // A healthy daemon answers almost immediately, so the first probes are
+    // short (10 x 50 ms); after that the interval goes back to 250 ms so a
+    // slow or wedged start does not cost CPU time.
+    const unsigned int fastAttempts = 10;
+    const unsigned int fastIntervalMs = 50;
+    const unsigned int slowIntervalMs = 250;
     unsigned int waitedMs = 0;
+    unsigned int attempt = 0;
     for (;;) {
         if (IsDaemonRunning()) {
             return true;
@@ -156,8 +168,10 @@ bool WaitForDaemon(unsigned int timeoutMs) {
         if (waitedMs >= timeoutMs) {
             return false;
         }
-        Sleep(attemptIntervalMs);
-        waitedMs += attemptIntervalMs;
+        const unsigned int interval = (attempt < fastAttempts) ? fastIntervalMs : slowIntervalMs;
+        Sleep(interval);
+        waitedMs += interval;
+        ++attempt;
     }
 }
 
