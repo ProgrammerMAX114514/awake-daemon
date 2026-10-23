@@ -17,12 +17,14 @@
 // any consequences arising from the use of this software.
 
 // =============================================================================
-// version.h - the single source of the awake version number.
+// version.h.in - template for the generated version header.
 //
-// Both the client (awake.exe) and the daemon (awake.daemon.exe) include
-// this header, so the version is defined in exactly one place. Bump the
-// numbers here when releasing a new version; everywhere else picks the
-// change up automatically.
+// CMake fills in the values from project(VERSION) and AWAKE_VERSION_SUFFIX in
+// CMakeLists.txt, so the version is defined in exactly one place. The result
+// is written to <build>/generated/include/version.h; never edit that copy.
+//
+// Bumping a release: change project(VERSION ...) in CMakeLists.txt (and
+// clear AWAKE_VERSION_SUFFIX for a stable release), then rebuild.
 // =============================================================================
 
 #ifndef AWAKE_VERSION_H
@@ -31,15 +33,15 @@
 namespace version {
 
 // Semantic version components.
-const int kMajor = 0;
-const int kMinor = 6;
-const int kPatch = 0;
+const int kMajor = @PROJECT_VERSION_MAJOR@;
+const int kMinor = @PROJECT_VERSION_MINOR@;
+const int kPatch = @PROJECT_VERSION_PATCH@;
 
 // Pre-release suffix ("" for stable releases).
-const char* const kSuffix = "-beta";
+const char* const kSuffix = "@AWAKE_VERSION_SUFFIX@";
 
-// Full version string, assembled from the components above, e.g. "0.6.0-beta".
-const char* const kVersion = "0.6.0-beta";
+// Full version string, assembled by CMake, e.g. "0.6.0-beta".
+const char* const kVersion = "@AWAKE_VERSION_FULL@";
 
 } // namespace version
 

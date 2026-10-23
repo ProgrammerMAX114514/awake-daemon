@@ -32,6 +32,11 @@ welcome.
   named pipe protocol.
 - **Style**: match the style of the surrounding code (4-space indent,
   `namespace` modules, camelCase functions with a `module::` prefix).
+- **Version numbers**: the version is declared only in `CMakeLists.txt`
+  (`project(awake VERSION ...)` plus `AWAKE_VERSION_SUFFIX`). `version.h` is
+  generated from `common/include/version.h.in` during configuration - never
+  edit a version anywhere else. The smoke test verifies that the client and
+  both READMEs agree with `CMakeLists.txt`.
 
 ## Commit and pull request guidelines
 

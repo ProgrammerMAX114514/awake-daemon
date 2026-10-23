@@ -30,6 +30,20 @@
 cmake_minimum_required(VERSION 3.15)
 project(awake VERSION 0.6.0 LANGUAGES CXX)
 
+# The version number lives in exactly one place: the project() call above.
+# version.h is generated from common/include/version.h.in during configuration,
+# so the client, the daemon and any future target always report the same
+# version without anybody having to keep two files in sync.
+#   Stable release:  set AWAKE_VERSION_SUFFIX to ""
+#   Pre-release:     "-beta", "-rc1", ...
+set(AWAKE_VERSION_SUFFIX "-beta")
+set(AWAKE_VERSION_FULL "${PROJECT_VERSION}${AWAKE_VERSION_SUFFIX}")
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/include/version.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/include/version.h
+    @ONLY
+)
+
 # Use C++17 for both targets.
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -55,7 +69,12 @@ add_library(awake_common STATIC
     common/src/process.cpp
     common/src/protocol.cpp
 )
-target_include_directories(awake_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/common/include)
+# The generated directory comes first so that "version.h" always resolves to
+# the configured copy.
+target_include_directories(awake_common PUBLIC
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/include
+)
 # advapi32 provides GetTokenInformation (elevation check); the registry
 # functions used by the autostart code live in the same library.
 target_link_libraries(awake_common PUBLIC advapi32)

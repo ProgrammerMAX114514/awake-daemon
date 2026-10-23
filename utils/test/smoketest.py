@@ -44,6 +44,7 @@
 import argparse
 import configparser
 import os
+import re
 import subprocess
 import sys
 import time
@@ -278,6 +279,34 @@ def test_version_and_help(cfg):
     code, out = run_client(cfg, ["definitely-not-a-command"])
     check("unknown command fails with a hint",
           code == 1 and "unknown command" in out.lower())
+
+
+def read_declared_version():
+    """Returns the version string declared in CMakeLists.txt, or None."""
+    path = os.path.join(REPO_ROOT, "CMakeLists.txt")
+    text = open(path, encoding="utf-8", errors="replace").read()
+    version = re.search(r"project\(awake VERSION (\d+\.\d+\.\d+)", text)
+    if not version:
+        return None
+    suffix = re.search(r'set\(AWAKE_VERSION_SUFFIX "([^"]*)"\)', text)
+    return version.group(1) + (suffix.group(1) if suffix else "")
+
+
+def test_version_is_single_source(cfg):
+    """R8: the version is declared once (CMakeLists.txt) and cannot drift."""
+    declared = read_declared_version()
+    check("CMakeLists.txt declares project(VERSION ...)", declared is not None, str(declared))
+    if not declared:
+        return
+
+    code, out = run_client(cfg, ["version"])
+    check("client reports the version from CMakeLists.txt",
+          code == 0 and declared in out, out.strip())
+
+    for name in ("README.md", "README.zh.md"):
+        path = os.path.join(REPO_ROOT, name)
+        text = open(path, encoding="utf-8", errors="replace").read()
+        check("%s advertises the same version" % name, declared in text, name)
 
 
 def test_command_suggestions(cfg):
@@ -543,6 +572,7 @@ def main():
 
     test_license_gate(cfg)
     test_version_and_help(cfg)
+    test_version_is_single_source(cfg)
     test_command_suggestions(cfg)
     test_status_without_daemon(cfg)
     test_daemon_lifecycle(cfg)
