@@ -61,6 +61,9 @@ std::set<std::string> FindRunningImages(const std::vector<std::string>& imageNam
             const std::string exeLower = config::ToLowerAscii(exeName);
             if (wanted.count(exeLower) > 0) {
                 found.insert(exeLower);
+                if (found.size() == wanted.size()) {
+                    break; // every watched name is accounted for (P3)
+                }
             }
         } while (Process32NextW(snapshot, &entry));
     }
