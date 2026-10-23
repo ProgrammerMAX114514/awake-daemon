@@ -102,6 +102,37 @@ jobs:
               "See the commit history for the changes in this release."
             ) | Set-Content -Encoding utf8 $notes
           }
+
+          # Insert a "Full Changelog" comparison link right after the
+          # "Package:" line of the release notes. The previous tag is the
+          # version-sorted tag immediately before the one being released;
+          # when there is none (first release), no link is added.
+          git fetch --quiet origin "+refs/tags/*:refs/tags/*"
+          $tags = @(@(git tag --sort="-v:refname") | Where-Object { $_ })
+          $index = [array]::IndexOf($tags, $tag)
+          if ($index -ge 0 -and $index -lt ($tags.Count - 1)) {
+            $previous = $tags[$index + 1]
+            $changelog = "**Full Changelog**: ${{ github.server_url }}/${{ github.repository }}/compare/$previous...$tag"
+            $lines = @(Get-Content $notes)
+            $packageLine = $null
+            for ($i = 0; $i -lt $lines.Count; $i++) {
+              # Match the "Package:" line regardless of markdown backticks.
+              if ($lines[$i] -match '^Package:') {
+                $packageLine = $i
+                break
+              }
+            }
+            if ($null -ne $packageLine) {
+              $updated = @($lines[0..$packageLine] + $changelog + $lines[($packageLine + 1)..($lines.Count - 1)])
+            } else {
+              $updated = @($lines + "" + $changelog)
+            }
+            $updated | Set-Content -Encoding utf8 $notes
+            Write-Host "changelog link: $changelog"
+          } else {
+            Write-Host "no previous tag found; the Full Changelog link is skipped"
+          }
+
           Write-Host "using $notes"
           "path=$notes" >> $env:GITHUB_OUTPUT
 
