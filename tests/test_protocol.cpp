@@ -109,3 +109,70 @@ TEST_CASE("missing keys keep their default values", "[protocol]") {
     // Parsing does not reset fields that the response does not mention.
     REQUIRE(status.version == "stale");
 }
+
+// -----------------------------------------------------------------------------
+// Malformed / truncated input boundaries (R7b)
+// -----------------------------------------------------------------------------
+
+TEST_CASE("a truncated PONG without a newline still yields the version",
+          "[protocol]") {
+    std::string version;
+    REQUIRE(protocol::ParsePongResponse("OK PONG 0.7.0-beta", version));
+    REQUIRE(version == "0.7.0-beta");
+
+    // A PONG cut off inside the version simply yields the visible part.
+    REQUIRE(protocol::ParsePongResponse("OK PONG 0.7", version));
+    REQUIRE(version == "0.7");
+
+    // Nothing after the verb: the version stays empty but the response is
+    // still recognized as a pong.
+    REQUIRE(protocol::ParsePongResponse("OK PONG", version));
+    REQUIRE(version.empty());
+}
+
+TEST_CASE("a truncated status response parses its complete lines",
+          "[protocol]") {
+    protocol::DaemonStatus status;
+    // The final line has no trailing newline - the parser must not drop it.
+    REQUIRE(protocol::ParseStatusResponse("OK\nMANUAL=1\nSCREEN=1", status));
+    REQUIRE(status.manual);
+    REQUIRE(status.screen);
+}
+
+TEST_CASE("duplicate status keys: the last occurrence wins", "[protocol]") {
+    protocol::DaemonStatus status;
+    REQUIRE(protocol::ParseStatusResponse(
+        "OK\nMANUAL=1\nMANUAL=0\nVERSION=1.0.0\nVERSION=2.0.0\n", status));
+    REQUIRE_FALSE(status.manual);
+    REQUIRE(status.version == "2.0.0");
+}
+
+TEST_CASE("a version string keeps its inner spaces but loses the newline",
+          "[protocol]") {
+    protocol::DaemonStatus status;
+    REQUIRE(protocol::ParseStatusResponse("OK\nVERSION=1.2.3-beta (git abc)\n",
+                                          status));
+    REQUIRE(status.version == "1.2.3-beta (git abc)");
+    REQUIRE(status.version.find('\n') == std::string::npos);
+}
+
+TEST_CASE("an empty status response is rejected but harmless", "[protocol]") {
+    protocol::DaemonStatus status;
+    status.manual = true;
+    REQUIRE_FALSE(protocol::ParseStatusResponse("", status));
+    // A rejected response leaves the fields it did not mention untouched.
+    REQUIRE(status.manual);
+}
+
+TEST_CASE("remain seconds round trip through the status response",
+          "[protocol]") {
+    protocol::DaemonStatus sent;
+    sent.manualRemaining = 3725; // 1h2m5s of a timed keep-awake
+    sent.screenRemaining = -1;   // "no expiry" marker
+    const std::string body = protocol::SerializeStatus(sent);
+
+    protocol::DaemonStatus received;
+    REQUIRE(protocol::ParseStatusResponse(body, received));
+    REQUIRE(received.manualRemaining == 3725);
+    REQUIRE(received.screenRemaining == -1);
+}

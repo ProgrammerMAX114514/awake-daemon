@@ -135,14 +135,16 @@ bool ParsePongResponse(const std::string& response, std::string& daemonVersion) 
         return false;
     }
     // Everything after "OK PONG" and the separating space on the first line
-    // is the daemon version.
+    // is the daemon version. A response without a trailing newline (a
+    // truncated read) still yields the version.
     const size_t lineEnd = response.find('\n');
+    const size_t end = (lineEnd == std::string::npos) ? response.size() : lineEnd;
     size_t versionStart = 7; // right after "OK PONG"
-    while (versionStart < lineEnd && response[versionStart] == ' ') {
+    while (versionStart < end && response[versionStart] == ' ') {
         ++versionStart; // skip the separator space(s)
     }
-    if (lineEnd != std::string::npos && lineEnd > versionStart) {
-        daemonVersion = response.substr(versionStart, lineEnd - versionStart);
+    if (end > versionStart) {
+        daemonVersion = response.substr(versionStart, end - versionStart);
     }
     return true;
 }
