@@ -32,12 +32,14 @@ namespace process {
 std::set<std::string> FindRunningImages(const std::vector<std::string>& imageNames) {
     std::set<std::string> found;
 
-    // Lower case copies of the watch list, so the per-process comparison
-    // below stays a simple string equality test.
-    std::vector<std::string> lowered;
-    lowered.reserve(imageNames.size());
+    // Lower case copy of the watch list in a set: every process name is then
+    // a single hash lookup instead of a scan over the whole list.
+    std::set<std::string> wanted;
     for (size_t i = 0; i < imageNames.size(); ++i) {
-        lowered.push_back(config::ToLowerAscii(imageNames[i]));
+        wanted.insert(config::ToLowerAscii(imageNames[i]));
+    }
+    if (wanted.empty()) {
+        return found; // nothing to look for, no snapshot needed
     }
 
     // One snapshot lists every process currently running on the system.
@@ -57,11 +59,8 @@ std::set<std::string> FindRunningImages(const std::vector<std::string>& imageNam
             WideCharToMultiByte(CP_ACP, 0, entry.szExeFile, -1,
                                 exeName, MAX_PATH, NULL, NULL);
             const std::string exeLower = config::ToLowerAscii(exeName);
-            for (size_t i = 0; i < lowered.size(); ++i) {
-                if (exeLower == lowered[i]) {
-                    found.insert(lowered[i]);
-                    break; // this process cannot match another name
-                }
+            if (wanted.count(exeLower) > 0) {
+                found.insert(exeLower);
             }
         } while (Process32NextW(snapshot, &entry));
     }

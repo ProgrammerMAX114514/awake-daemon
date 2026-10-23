@@ -48,7 +48,13 @@ void ApplyDesiredState() {
     // Reload the configuration on every pass so that "awake add"/"awake del"
     // changes take effect without a daemon restart (hot reload).
     const std::vector<std::string> watchList = config::ReadWatchList();
-    const std::set<std::string> running = process::FindRunningImages(watchList);
+
+    // An empty watch list is the most common state; skipping the process
+    // snapshot entirely avoids a system-wide enumeration on every poll.
+    std::set<std::string> running;
+    if (!watchList.empty()) {
+        running = process::FindRunningImages(watchList);
+    }
 
     const bool manual = daemonstate::GetManual();
     const bool screen = daemonstate::GetScreen();
