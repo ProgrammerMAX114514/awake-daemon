@@ -44,7 +44,7 @@ welcome.
 - Use the conventional style already in the log: `feat:`, `fix:`,
   `refactor:`, `docs:`, `chore:`, `test:`.
 - Every pull request must pass the smoke test locally; include the test
-  summary (e.g. "69 passed, 0 failed") in the description.
+  summary (e.g. "74 passed, 0 failed") in the description.
 - New behaviour in `common/` should come with a unit test in `tests/`
   (Catch2 is vendored there; run `ctest --test-dir build` or the
   `awake_tests.exe` binary). The smoke test covers the CLI end to end, the
