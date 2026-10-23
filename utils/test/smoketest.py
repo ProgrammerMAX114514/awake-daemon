@@ -311,6 +311,8 @@ def test_status_without_daemon(cfg):
     code, out = run_client(cfg, ["status"])
     check("status without daemon reports not running",
           code == 0 and "not running" in out and "INACTIVE" in out and "Autostart:" in out, out.strip())
+    check("status without daemon does not warn about a missing version",
+          "did not report its version" not in out, out.strip())
 
 
 def test_daemon_lifecycle(cfg):

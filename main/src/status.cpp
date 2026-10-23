@@ -76,8 +76,12 @@ int cli::CmdStatus() {
     }
 
     // Keep-awake and screen states are authoritative only while the daemon
-    // runs; without it they are inactive by definition.
-    cli::CheckDaemonVersion(info.version);
+    // runs; without it they are inactive by definition. The version check is
+    // therefore skipped as well: with no daemon there is no version to
+    // compare, and warning about a "missing" version would be misleading.
+    if (running) {
+        cli::CheckDaemonVersion(info.version);
+    }
 
     if (!info.manual && !info.app) {
         // When only the screen keep-awake is on, the system idle sleep is
