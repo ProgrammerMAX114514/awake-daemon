@@ -92,6 +92,14 @@ python utils\test\smoketest.py
 
 It exercises every command (including aliases and the autostart registry entry), driven by the config file `utils/test/smoketest.ini` (test application, registry location, timeouts). Steps that cannot be automated from a normal shell - colors, `powercfg /requests` verification, logon autostart, manual-sleep behavior - are printed as a manual checklist at the end.
 
+Unit tests live in `tests/` (Catch2, vendored in `tests/third_party/catch2`, so no network access is needed). They are built together with the executables and cover the parts that are hard to reach through the CLI - image name validation, the line helpers of the config parser, and the wire protocol including unknown-key tolerance:
+
+```
+ctest --test-dir build --output-on-failure     # or run build\...\awake_tests.exe directly
+```
+
+`-DAWAKE_BUILD_TESTS=OFF` skips them when only the executables are wanted.
+
 ## Continuous integration
 
 Two GitHub Actions workflows live in `.github/workflows/`:

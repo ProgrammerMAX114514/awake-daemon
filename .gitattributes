@@ -7,6 +7,9 @@
 *.in text eol=lf
 *.md text eol=lf
 *.yml text eol=lf
+
+# Vendored third-party code is kept byte-for-byte as distributed.
+tests/third_party/** -text
 CMakeLists.txt text eol=lf
 LICENSE text eol=lf
 NOTICE text eol=lf

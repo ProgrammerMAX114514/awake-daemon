@@ -61,6 +61,18 @@ jobs:
             exit 1
           }
 
+      # The unit tests run before the smoke test: they are fast and they point
+      # at the module that broke instead of at a symptom in the CLI.
+      - name: Unit tests
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path build -Recurse -Filter awake_tests.exe |
+                 Select-Object -First 1
+          if (-not $exe) { throw "awake_tests.exe was not built." }
+          Write-Host "running $($exe.FullName)"
+          & $exe.FullName
+          if ($LASTEXITCODE -ne 0) { throw "Unit tests failed." }
+
       - name: Smoke test
         shell: pwsh
         run: python utils\test\smoketest.py

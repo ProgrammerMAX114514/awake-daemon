@@ -136,3 +136,14 @@ add_executable(awake.daemon
 )
 target_include_directories(awake.daemon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/daemon/include)
 target_link_libraries(awake.daemon PRIVATE awake_common)
+
+# -----------------------------------------------------------------------------
+# Unit tests (R7). They link the same static library the executables use, so a
+# behaviour change in common/ shows up here before it reaches a binary.
+# AWAKE_BUILD_TESTS=OFF skips them (useful for packaging-only builds).
+# -----------------------------------------------------------------------------
+option(AWAKE_BUILD_TESTS "Build the unit tests" ON)
+if(AWAKE_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

@@ -45,6 +45,10 @@ welcome.
   `refactor:`, `docs:`, `chore:`, `test:`.
 - Every pull request must pass the smoke test locally; include the test
   summary (e.g. "69 passed, 0 failed") in the description.
+- New behaviour in `common/` should come with a unit test in `tests/`
+  (Catch2 is vendored there; run `ctest --test-dir build` or the
+  `awake_tests.exe` binary). The smoke test covers the CLI end to end, the
+  unit tests cover the parsing and helper logic.
 - CI (`.github/workflows/ci.yml`) builds the project and runs the same smoke
   test on every push and pull request; a red run blocks the merge. Releases
   are produced by `release.yml` from a version tag - see the README for the

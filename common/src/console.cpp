@@ -27,6 +27,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <io.h>
+#include <string>
 
 namespace console {
 
@@ -73,17 +74,61 @@ void SuppressAiNotice() {
     g_aiNoticeSuppressed = true;
 }
 
+namespace {
+
+// Reads an environment variable. _dupenv_s is used under MSVC because plain
+// getenv() is flagged as deprecated (C4996) at /W4.
+bool ReadEnv(const char* name, std::string& value) {
+    value.clear();
+#if defined(_MSC_VER)
+    char* buffer = NULL;
+    size_t size = 0;
+    if (_dupenv_s(&buffer, &size, name) != 0 || buffer == NULL) {
+        return false;
+    }
+    value.assign(buffer);
+    std::free(buffer);
+    return true;
+#else
+    const char* raw = std::getenv(name);
+    if (raw == NULL) {
+        return false;
+    }
+    value.assign(raw);
+    return true;
+#endif
+}
+
+// Case-insensitive comparison against an ASCII literal, so that
+// AWAKE_AI_NOTICE=ALWAYS works as well.
+bool EqualsIgnoreCase(const std::string& value, const char* expected) {
+    size_t i = 0;
+    for (; i < value.size(); ++i) {
+        char c = value[i];
+        if (c >= 'A' && c <= 'Z') {
+            c = static_cast<char>(c - 'A' + 'a');
+        }
+        if (expected[i] == '\0' || c != expected[i]) {
+            return false;
+        }
+    }
+    return expected[i] == '\0';
+}
+
+} // namespace
+
 void PrintAiNotice() {
     if (g_aiNoticeSuppressed) {
         return;
     }
     // AWAKE_AI_NOTICE overrides the automatic decision; the default is to
     // show the line only when a human is actually looking at the terminal.
-    const char* mode = std::getenv("AWAKE_AI_NOTICE");
+    std::string mode;
+    const bool hasMode = ReadEnv("AWAKE_AI_NOTICE", mode);
     bool show = true;
-    if (mode != NULL && _stricmp(mode, "always") == 0) {
+    if (hasMode && EqualsIgnoreCase(mode, "always")) {
         show = true;
-    } else if (mode != NULL && _stricmp(mode, "never") == 0) {
+    } else if (hasMode && EqualsIgnoreCase(mode, "never")) {
         show = false;
     } else {
         show = (_isatty(_fileno(stderr)) != 0);
@@ -94,7 +139,8 @@ void PrintAiNotice() {
 
     // stderr, not stdout: a redirected stdout (pipes, redirects, the future
     // --json mode) must stay machine-readable.
-    const bool plain = (std::getenv("NO_COLOR") != NULL);
+    std::string noColor;
+    const bool plain = ReadEnv("NO_COLOR", noColor);
     std::fprintf(stderr, "%sAI-generated software: review before use.%s\n",
                  plain ? "" : kColorYellow, plain ? "" : kColorReset);
 }

@@ -92,6 +92,14 @@ python utils\test\smoketest.py
 
 它会遍历所有命令（包括别名和自启注册表项）并检查行为，由配置文件 `utils/test/smoketest.ini` 驱动（测试用应用、注册表位置、超时时间）。无法在普通 shell 中自动化的步骤——颜色效果、`powercfg /requests` 交叉验证、登录自启、手动睡眠行为——会在结尾以人工检查清单的形式列出。
 
+单元测试位于 `tests/`（Catch2，已内置在 `tests/third_party/catch2`，无需联网）。它们与可执行文件一起构建，覆盖那些从命令行难以触达的部分——映像名校验、配置解析的行处理助手、以及包含「容忍未知字段」承诺的通信协议：
+
+```
+ctest --test-dir build --output-on-failure     # 或直接运行 build\...\awake_tests.exe
+```
+
+只想构建可执行文件时用 `-DAWAKE_BUILD_TESTS=OFF` 跳过。
+
 ## 持续集成
 
 `.github/workflows/` 下有两个 GitHub Actions 工作流：
