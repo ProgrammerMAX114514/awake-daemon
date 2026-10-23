@@ -2,6 +2,7 @@
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Release](https://img.shields.io/github/v/tag/ProgrammerMAX114514/awake-daemon?sort=semver&label=release)
+![CI](https://github.com/ProgrammerMAX114514/awake-daemon/actions/workflows/ci.yml/badge.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-blue)
 ![Language](https://img.shields.io/badge/language-C%2B%2B17-blue)
 
@@ -90,6 +91,17 @@ python utils\test\smoketest.py
 ```
 
 It exercises every command (including aliases and the autostart registry entry), driven by the config file `utils/test/smoketest.ini` (test application, registry location, timeouts). Steps that cannot be automated from a normal shell - colors, `powercfg /requests` verification, logon autostart, manual-sleep behavior - are printed as a manual checklist at the end.
+
+## Continuous integration
+
+Two GitHub Actions workflows live in `.github/workflows/`:
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `ci.yml` | push to `main`, every pull request, manual | Builds Release with `utils\build.bat`, verifies that the binary reports the version declared in `CMakeLists.txt`, runs the smoke test and uploads the executables as artifacts. |
+| `release.yml` | push of a version tag (`0.*`), manual with a tag input | Builds, **refuses to publish unless the tag equals the built version**, packages `awake-daemon.win64.zip` plus `SHA256SUMS.txt` and creates the GitHub release with the notes from `.github/release-notes/<tag>.md`. |
+
+A release is therefore: bump `project(VERSION ...)`, commit, tag, push the tag. The notes file is the only thing worth writing by hand - without it the workflow falls back to a short generated body.
 
 ## Usage
 

@@ -45,6 +45,10 @@ welcome.
   `refactor:`, `docs:`, `chore:`, `test:`.
 - Every pull request must pass the smoke test locally; include the test
   summary (e.g. "69 passed, 0 failed") in the description.
+- CI (`.github/workflows/ci.yml`) builds the project and runs the same smoke
+  test on every push and pull request; a red run blocks the merge. Releases
+  are produced by `release.yml` from a version tag - see the README for the
+  short version.
 - Changes to the wire protocol must be made in `common/include/protocol.h`
   (single source of truth) and keep older clients working where possible -
   `ParseStatusResponse` ignores unknown KEY=VALUE lines on purpose.

@@ -1,0 +1,76 @@
+# =============================================================================
+# ci.yml - build and smoke test every change.
+#
+# The project is Windows only, so a Windows runner is enough. The steps use the
+# same entry points a developer uses locally (utils\build.bat, the smoke test),
+# which keeps CI and local builds from diverging.
+#
+# No toolchain configuration is committed: utils\msvc-env.ps1 finds the Visual
+# Studio installation that ships with the runner image, and utils\build.ps1
+# derives the matching CMake generator from it (17 -> "Visual Studio 17 2022"
+# on the current images, 18 -> "Visual Studio 18 2026" on newer ones).
+# =============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and smoke test
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Show the toolchain
+        shell: cmd
+        run: |
+          cmake --version
+          pwsh -NoProfile -Command "$PSVersionTable.PSVersion.ToString()"
+
+      # Builds Release; the script falls back to the NMake generator when the
+      # Visual Studio generator is unavailable, so a missing IDE cannot fail
+      # the job silently.
+      - name: Build
+        shell: cmd
+        run: utils\build.bat
+
+      # The version is declared once, in CMakeLists.txt; this step makes sure
+      # the binary really reports it (R8 regression guard).
+      - name: Verify the version
+        shell: pwsh
+        run: |
+          $cmakeLists = Get-Content CMakeLists.txt -Raw
+          $version = [regex]::Match($cmakeLists, 'project\(awake VERSION (\d+\.\d+\.\d+)').Groups[1].Value
+          $suffix = [regex]::Match($cmakeLists, 'set\(AWAKE_VERSION_SUFFIX "([^"]*)"\)').Groups[1].Value
+          $expected = "$version$suffix"
+          $reported = (& .\build\Release\awake.exe version) -join ' '
+          Write-Host "expected: $expected"
+          Write-Host "reported: $reported"
+          if ($reported -notmatch [regex]::Escape($expected)) {
+            Write-Error "The binary does not report the version declared in CMakeLists.txt."
+            exit 1
+          }
+
+      - name: Smoke test
+        shell: pwsh
+        run: python utils\test\smoketest.py
+
+      - name: Upload the executables
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: awake-win64
+          path: |
+            build/Release/awake.exe
+            build/Release/awake.daemon.exe
+          if-no-files-found: warn

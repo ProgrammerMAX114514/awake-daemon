@@ -1,0 +1,118 @@
+# =============================================================================
+# release.yml - build and publish a release when a version tag is pushed.
+#
+# The tag is treated as a claim, not as the source of truth: the workflow
+# builds the tree, reads the version the binary reports (which comes from
+# CMakeLists.txt, see R8) and refuses to publish unless the two are identical.
+# That way a release can never contain a binary that disagrees with its tag.
+#
+# Release notes come from .github/release-notes/<tag>.md when that file
+# exists; otherwise a minimal body is generated. The zip contains the same
+# four files as the manual release procedure.
+# =============================================================================
+name: Release
+
+on:
+  push:
+    tags:
+      - '[0-9]*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build a release for (e.g. 0.6.0-beta)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Resolve the tag
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag }}"
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = $env:GITHUB_REF_NAME }
+          if ([string]::IsNullOrWhiteSpace($tag)) { throw "No tag to release." }
+          Write-Host "releasing $tag"
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Build
+        shell: cmd
+        run: utils\build.bat
+
+      # Refuse to publish when the binary and the tag disagree.
+      - name: Verify the tag against the built version
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.version.outputs.tag }}"
+          $cmakeLists = Get-Content CMakeLists.txt -Raw
+          $version = [regex]::Match($cmakeLists, 'project\(awake VERSION (\d+\.\d+\.\d+)').Groups[1].Value
+          $suffix = [regex]::Match($cmakeLists, 'set\(AWAKE_VERSION_SUFFIX "([^"]*)"\)').Groups[1].Value
+          $expected = "$version$suffix"
+          $reported = (& .\build\Release\awake.exe version) -join ' '
+          Write-Host "tag      : $tag"
+          Write-Host "expected : $expected"
+          Write-Host "reported : $reported"
+          if ($tag -ne $expected) {
+            throw "Tag '$tag' does not match the built version '$expected'. Bump CMakeLists.txt or fix the tag."
+          }
+          if ($reported -notmatch [regex]::Escape($expected)) {
+            throw "The binary reports '$reported' instead of '$expected'."
+          }
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $stage = "build\stage"
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          Copy-Item build\Release\awake.exe, build\Release\awake.daemon.exe, LICENSE, NOTICE $stage
+          $sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe'
+          $zip = Join-Path (Resolve-Path .).Path 'awake-daemon.win64.zip'
+          if (Test-Path $sevenZip) {
+            Push-Location $stage
+            try { & $sevenZip a -tzip $zip '*' -bso0 } finally { Pop-Location }
+          } else {
+            Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip
+          }
+          if (-not (Test-Path $zip)) { throw "Packaging failed." }
+          $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLower()
+          "$hash  awake-daemon.win64.zip" | Set-Content -Encoding ascii SHA256SUMS.txt
+          Get-ChildItem awake-daemon.win64.zip, SHA256SUMS.txt | Format-Table Name, Length
+
+      - name: Pick the release notes
+        id: notes
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.version.outputs.tag }}"
+          $notes = ".github/release-notes/$tag.md"
+          if (-not (Test-Path $notes)) {
+            $notes = Join-Path $env:RUNNER_TEMP "notes.md"
+            @(
+              "Build of tag ``$tag``.",
+              "",
+              "See the commit history for the changes in this release."
+            ) | Set-Content -Encoding utf8 $notes
+          }
+          Write-Host "using $notes"
+          "path=$notes" >> $env:GITHUB_OUTPUT
+
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: awake ${{ steps.version.outputs.tag }}
+          body_path: ${{ steps.notes.outputs.path }}
+          files: |
+            awake-daemon.win64.zip
+            SHA256SUMS.txt
+          prerelease: ${{ contains(steps.version.outputs.tag, '-') }}
+          fail_on_unmatched_files: true

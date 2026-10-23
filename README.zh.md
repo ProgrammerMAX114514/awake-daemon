@@ -2,6 +2,7 @@
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Release](https://img.shields.io/github/v/tag/ProgrammerMAX114514/awake-daemon?sort=semver&label=release)
+![CI](https://github.com/ProgrammerMAX114514/awake-daemon/actions/workflows/ci.yml/badge.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-blue)
 ![Language](https://img.shields.io/badge/language-C%2B%2B17-blue)
 
@@ -90,6 +91,17 @@ python utils\test\smoketest.py
 ```
 
 它会遍历所有命令（包括别名和自启注册表项）并检查行为，由配置文件 `utils/test/smoketest.ini` 驱动（测试用应用、注册表位置、超时时间）。无法在普通 shell 中自动化的步骤——颜色效果、`powercfg /requests` 交叉验证、登录自启、手动睡眠行为——会在结尾以人工检查清单的形式列出。
+
+## 持续集成
+
+`.github/workflows/` 下有两个 GitHub Actions 工作流：
+
+| 工作流 | 触发条件 | 内容 |
+|---|---|---|
+| `ci.yml` | 推送到 `main`、每个 PR、手动 | 用 `utils\build.bat` 构建 Release，校验二进制报告的版本与 `CMakeLists.txt` 一致，跑冒烟测试，并把可执行文件作为 artifact 上传。 |
+| `release.yml` | 推送版本 tag（`0.*`）、手动指定 tag | 构建后**校验 tag 与构建出的版本一致，不一致拒绝发布**，打包 `awake-daemon.win64.zip` 与 `SHA256SUMS.txt`，用 `.github/release-notes/<tag>.md` 作为正文创建 GitHub Release。 |
+
+因此发布流程变成：改 `project(VERSION ...)` → 提交 → 打 tag → 推送 tag。唯一值得手写的只有发布说明文件，缺失时工作流会退化为一段简短正文。
 
 ## 使用方法
 

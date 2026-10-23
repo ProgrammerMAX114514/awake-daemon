@@ -6,6 +6,7 @@
 *.h text eol=lf
 *.in text eol=lf
 *.md text eol=lf
+*.yml text eol=lf
 CMakeLists.txt text eol=lf
 LICENSE text eol=lf
 NOTICE text eol=lf
