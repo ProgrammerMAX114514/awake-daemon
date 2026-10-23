@@ -56,26 +56,37 @@ std::string GetExeDirectory();
 // does not exist yet. Does nothing when the file is already present.
 // Returns true when the file exists afterwards.
 bool EnsureConfigExists();
+// Same as above, but for an explicit file path (the unit tests use this to
+// work in a temporary directory instead of next to the executable).
+bool EnsureConfigExists(const std::string& path);
 
 // Overwrites the configuration file with the initial template content,
 // discarding every existing watch list entry. Manual edits and comments
 // are not preserved. Returns false when the file cannot be written.
 bool ResetConfig();
+// Same as above, but for an explicit file path.
+bool ResetConfig(const std::string& path);
 
 // Reads the watch list (the image names currently configured).
 // Comment lines, empty lines, section headers and the settings of other
 // sections (for example [license]) are skipped.
 std::vector<std::string> ReadWatchList();
+// Same as above, but for an explicit file path.
+std::vector<std::string> ReadWatchList(const std::string& path);
 
 // Appends one image name to the watch list. The entry is validated with
 // IsValidImageName() first and duplicates (case-insensitive) are rejected.
 // Returns false when the name is invalid or already present.
 bool AddWatchEntry(const std::string& imageName);
+// Same as above, but for an explicit file path.
+bool AddWatchEntry(const std::string& path, const std::string& imageName);
 
 // Removes one image name (case-insensitive) from the watch list. All other
 // lines, including comments, are preserved. Returns false when the name is
 // not present in the list.
 bool RemoveWatchEntry(const std::string& imageName);
+// Same as above, but for an explicit file path.
+bool RemoveWatchEntry(const std::string& path, const std::string& imageName);
 
 // Validates a user supplied image name: it must be a plain file name
 // (no path separators, no wildcards, printable ASCII, reasonable length).

@@ -274,7 +274,10 @@ std::string GetConfigPath() {
 }
 
 bool EnsureConfigExists() {
-    const std::string path = GetConfigPath();
+    return EnsureConfigExists(GetConfigPath());
+}
+
+bool EnsureConfigExists(const std::string& path) {
     const DWORD attributes = GetFileAttributesA(path.c_str());
     if (attributes != INVALID_FILE_ATTRIBUTES) {
         return true; // the file already exists
@@ -283,12 +286,20 @@ bool EnsureConfigExists() {
 }
 
 bool ResetConfig() {
-    return WriteInitialConfig(GetConfigPath());
+    return ResetConfig(GetConfigPath());
+}
+
+bool ResetConfig(const std::string& path) {
+    return WriteInitialConfig(path);
 }
 
 std::vector<std::string> ReadWatchList() {
+    return ReadWatchList(GetConfigPath());
+}
+
+std::vector<std::string> ReadWatchList(const std::string& path) {
     std::vector<std::string> entries;
-    std::ifstream file(GetConfigPath().c_str(), std::ios::binary);
+    std::ifstream file(path.c_str(), std::ios::binary);
     if (!file.is_open()) {
         return entries; // no file, no entries
     }
@@ -312,13 +323,16 @@ std::vector<std::string> ReadWatchList() {
 }
 
 bool AddWatchEntry(const std::string& imageName) {
+    return AddWatchEntry(GetConfigPath(), imageName);
+}
+
+bool AddWatchEntry(const std::string& path, const std::string& imageName) {
     if (!IsValidImageName(imageName)) {
         return false;
     }
-    if (!EnsureConfigExists()) {
+    if (!EnsureConfigExists(path)) {
         return false;
     }
-    const std::string path = GetConfigPath();
 
     // Read the whole file so that comments are preserved and duplicates
     // (case-insensitive) can be detected.
@@ -362,10 +376,13 @@ bool AddWatchEntry(const std::string& imageName) {
 }
 
 bool RemoveWatchEntry(const std::string& imageName) {
+    return RemoveWatchEntry(GetConfigPath(), imageName);
+}
+
+bool RemoveWatchEntry(const std::string& path, const std::string& imageName) {
     if (!IsValidImageName(imageName)) {
         return false;
     }
-    const std::string path = GetConfigPath();
 
     std::vector<std::string> lines;
     if (!ReadAllLines(path, lines)) {
