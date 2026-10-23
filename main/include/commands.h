@@ -39,6 +39,14 @@ bool CheckDaemonVersion(const std::string& daemonVersion);
 // without arguments and as a hint after unknown commands.
 void PrintHelp();
 
+// Prints the "command -> accepted spellings" table. One command per line,
+// aligned in two columns; shared by the help text and "awake aliases".
+void PrintAliasTable();
+
+// "awake aliases" (also: "awake a", "awake alias"): prints every command
+// together with its aliases. Documentation only, no side effects.
+int CmdAliases();
+
 // First-run license gate. When the configuration file does not record an
 // accepted license, the full Apache License 2.0 text is printed, the user
 // is asked for confirmation and the answer is stored in awake.ini.

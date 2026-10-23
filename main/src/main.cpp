@@ -25,6 +25,7 @@
 //
 //   awake version           print the version
 //   awake help              print help
+//   awake aliases           print every command alias (also: awake a)
 //   awake 0                 disable keep-awake
 //   awake 1                 enable keep-awake
 //   awake status            show daemon/keep-awake/screen/watch list status
@@ -78,13 +79,15 @@ int main(int argc, char** argv) {
 
     const std::string command = argv[1];
 
-    // First-run license gate. "help" and "version" stay available without
-    // accepting the license, so a new user can read the version and the
-    // usage before deciding; every other command requires the acceptance.
-    const bool helpOrVersion = (command == "version" || command == "help" ||
+    // First-run license gate. "help", "version" and "aliases" stay available
+    // without accepting the license: they only print documentation and do not
+    // touch the system, so a new user can read them before deciding. Every
+    // other command requires the acceptance.
+    const bool documentation = (command == "version" || command == "help" ||
                                 command == "?" || command == "h" ||
-                                command == "/?" || command == "-h" || command == "--help");
-    if (!helpOrVersion && !cli::EnsureLicenseAccepted()) {
+                                command == "/?" || command == "-h" || command == "--help" ||
+                                command == "aliases" || command == "a" || command == "alias");
+    if (!documentation && !cli::EnsureLicenseAccepted()) {
         return 1;
     }
 
@@ -96,6 +99,9 @@ int main(int argc, char** argv) {
         command == "/?" || command == "-h" || command == "--help") {
         cli::PrintHelp();
         return 0;
+    }
+    if (command == "aliases" || command == "a" || command == "alias") {
+        return cli::CmdAliases();
     }
     if (command == "0" || command == "off" || command == "disable" || command == "stop") {
         return cli::CmdSetKeepAwake(false);

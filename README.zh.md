@@ -100,9 +100,12 @@ awake reload            让守护进程立即重新读取配置文件。
 awake reset             重置配置文件（会要求二次确认）。
 awake add <imagename>   向监视列表添加映像名。
 awake del <imagename>   从监视列表删除映像名。
+awake aliases           显示所有命令别名（也可写作 awake a / awake alias）。
 ```
 
 命令别名：`awake ?` 和 `awake h` 等价于 `awake help`；`awake off`、`disable`、`stop` 等价于 `awake 0`；`awake on`、`enable`、`start` 等价于 `awake 1`；`awake st` 等价于 `awake status`；`awake scr` 等价于 `awake screen`；`awake screen 1` / `screen 0` 等价于 `screen on` / `screen off`；`awake d` 等价于 `awake daemon`；`awake daemon 1` / `daemon start` 等价于 `daemon on`；`awake daemon 0` / `daemon stop` 等价于 `daemon off`。
+
+`awake aliases` 随时以下表形式输出同一份映射；帮助信息中它作为独立的「Command aliases」小节显示。
 
 说明：
 

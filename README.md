@@ -100,9 +100,12 @@ awake reload            Re-read the configuration file immediately.
 awake reset             Reset the configuration file (asks for confirmation).
 awake add <imagename>   Add an image name to the watch list.
 awake del <imagename>   Remove an image name from the watch list.
+awake aliases           Show every command alias (also: awake a / awake alias).
 ```
 
 Command aliases: `awake ?` and `awake h` are equivalent to `awake help`; `awake off`, `disable`, `stop` are equivalent to `awake 0`; `awake on`, `enable`, `start` are equivalent to `awake 1`; `awake st` is equivalent to `awake status`; `awake scr` is equivalent to `awake screen`; `awake screen 1` / `screen 0` are equivalent to `screen on` / `screen off`; `awake d` is equivalent to `awake daemon`; `awake daemon 1` / `daemon start` are equivalent to `daemon on`; `awake daemon 0` / `daemon stop` are equivalent to `daemon off`.
+
+`awake aliases` prints the same mapping as an aligned table at any time (the help message shows it in its own "Command aliases" section).
 
 Notes:
 

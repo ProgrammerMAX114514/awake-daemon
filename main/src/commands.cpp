@@ -42,6 +42,30 @@
 // -----------------------------------------------------------------------------
 
 // Prints the colored usage help. This is shown for "awake help", for
+// One row of the alias table: the canonical command and every other spelling
+// that dispatches to it. Commands without an alias are not listed here; they
+// are already shown in the usage block.
+struct AliasRow {
+    const char* command;
+    const char* aliases;
+};
+
+const AliasRow kAliasRows[] = {
+    { "awake help",        "?, h, /?, -h, --help" },
+    { "awake aliases",     "a, alias" },
+    { "awake 0",           "off, disable, stop" },
+    { "awake 1",           "on, enable, start" },
+    { "awake status",      "st" },
+    { "awake screen",      "scr" },
+    { "awake screen on",   "screen 1" },
+    { "awake screen off",  "screen 0" },
+    { "awake daemon",      "d" },
+    { "awake daemon on",   "daemon 1, daemon start" },
+    { "awake daemon off",  "daemon 0, daemon stop" },
+};
+
+const size_t kAliasRowCount = sizeof(kAliasRows) / sizeof(kAliasRows[0]);
+
 // "awake" without arguments and as a hint after unknown commands.
 void cli::PrintHelp() {
     console::Printf(console::kColorCyan, "awake %s - keep the system awake\n", version::kVersion);
@@ -61,6 +85,11 @@ void cli::PrintHelp() {
     console::Printf(console::kColorReset,   "  awake reset             %sReset the configuration file (asks for confirmation).\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake add <imagename>   %sAdd an image name to the watch list.\n", console::kColorReset);
     console::Printf(console::kColorReset,   "  awake del <imagename>   %sRemove an image name from the watch list.\n", console::kColorReset);
+    console::Printf(console::kColorReset,   "  awake aliases           %sShow every command alias (same as 'awake a').\n", console::kColorReset);
+    console::PrintLine(console::kColorReset, "");
+    console::PrintLine(console::kColorReset, "Command aliases:");
+    cli::PrintAliasTable();
+    console::PrintLine(console::kColorReset, "  Commands that are not listed accept no alias.");
     console::PrintLine(console::kColorReset, "");
     console::PrintLine(console::kColorReset, "Notes:");
     console::PrintLine(console::kColorReset, "  - Keep-awake only blocks idle sleep/hibernation. Manual sleep via the");
@@ -69,12 +98,29 @@ void cli::PrintHelp() {
     console::PrintLine(console::kColorReset, "    blocks idle sleep/hibernation as well.");
     console::PrintLine(console::kColorReset, "  - 'awake 0' and 'awake 1' start the daemon automatically when needed;");
     console::PrintLine(console::kColorReset, "    'awake status' never does.");
-    console::PrintLine(console::kColorReset, "  - Command aliases: '?', 'h' = help; 'off', 'disable', 'stop' = 0;");
-    console::PrintLine(console::kColorReset, "    'on', 'enable', 'start' = 1; 'st' = status; 'scr' = screen;");
-    console::PrintLine(console::kColorReset, "    'screen 1/0' = 'screen on/off'; 'd' = daemon; 'daemon 1/start' =");
-    console::PrintLine(console::kColorReset, "    'daemon on'; 'daemon 0/stop' = 'daemon off'.");
     console::PrintLine(console::kColorReset, "  - The first run shows the Apache License 2.0 and asks for acceptance;");
     console::PrintLine(console::kColorReset, "    the answer is stored in the [license] section of awake.ini.");
+}
+
+// Prints the alias table with the canonical command in the first column and
+// every accepted spelling in the second one. The column width is fixed, so
+// each command stays on exactly one output line.
+void cli::PrintAliasTable() {
+    for (size_t i = 0; i < kAliasRowCount; ++i) {
+        console::Printf(console::kColorReset, "  %-24s %s\n",
+                        kAliasRows[i].command, kAliasRows[i].aliases);
+    }
+}
+
+// "awake aliases": documentation command, no side effects.
+int cli::CmdAliases() {
+    console::Printf(console::kColorCyan, "awake %s - command aliases\n", version::kVersion);
+    console::PrintLine(console::kColorReset, "");
+    cli::PrintAliasTable();
+    console::PrintLine(console::kColorReset, "");
+    console::PrintLine(console::kColorReset, "Commands that are not listed accept no alias.");
+    console::PrintLine(console::kColorReset, "Run 'awake help' for the full usage.");
+    return 0;
 }
 
 // -----------------------------------------------------------------------------

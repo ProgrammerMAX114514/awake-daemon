@@ -233,6 +233,9 @@ def test_license_gate(cfg):
     code, out = run_client(cfg, ["help"])
     check("help is exempt from the license gate",
           code == 0 and "Usage:" in out, out.strip())
+    code, out = run_client(cfg, ["aliases"])
+    check("aliases is exempt from the license gate",
+          code == 0 and "awake daemon" in out, out.strip()[-160:])
 
     set_license_accepted(cfg, True)
     code, out = run_client(cfg, ["status"])
@@ -252,6 +255,25 @@ def test_version_and_help(cfg):
     check("alias 'h' shows help", code == 0 and "Usage:" in out)
     code, out = run_client(cfg, ["?"])
     check("alias '?' shows help", code == 0 and "Usage:" in out)
+
+    # "Command aliases" is its own section between Usage and Notes.
+    code, out = run_client(cfg, ["help"])
+    aliases_at = out.find("Command aliases:")
+    notes_at = out.find("Notes:")
+    check("help has a Command aliases section before Notes",
+          code == 0 and aliases_at > 0 and notes_at > aliases_at, out.strip()[-160:])
+    check("help lists the daemon alias", "awake daemon" in out and "d" in out)
+
+    code, out = run_client(cfg, ["aliases"])
+    check("awake aliases prints the alias table",
+          code == 0 and "awake help" in out and "daemon start" in out, out.strip()[-160:])
+    check("awake aliases lists the 'd' alias for daemon",
+          "awake daemon" in out and " d" in out)
+
+    for alias in ("a", "alias"):
+        code, alias_out = run_client(cfg, [alias])
+        check("alias '%s' prints the alias table" % alias,
+              code == 0 and alias_out == out)
 
     code, out = run_client(cfg, ["definitely-not-a-command"])
     check("unknown command fails with a hint",
