@@ -34,6 +34,9 @@ Every release tag is GPG-signed; the release notes list the highlights, the beha
 - **Screen keep-awake** (`awake screen on`): additionally keeps the screen on - blocks the display turning off, the screensaver and the lock screen caused by idle timeout.
 - **Application watch list**: image names configured in `awake.ini`; while any of them is running, the daemon blocks idle sleep/hibernation the same way (checked every 30 seconds).
 - **Daemon autostart** (`awake daemon enable`): optionally starts the daemon automatically at logon (written to the per-user registry Run key, no admin rights needed).
+- **Script-friendly output** (`awake list`, `--json`, `--no-color` / `NO_COLOR`): plain text and JSON modes for scripts and CI.
+- **Status details**: `awake status` also shows the system power plan timeouts, the screensaver setting and which execution state requests the daemon holds.
+- **Daemon logging** (`awake log`): optional rolling log files in `%LOCALAPPDATA%\awake\logs\daemon` with configurable level and limits, and a one-command zip export (`awake log export`) for issue attachments.
 - **Colored console output** via ANSI escape sequences.
 - The client starts the daemon automatically when needed (for `awake 0` / `awake 1`).
 
@@ -125,6 +128,7 @@ awake 1 until <HH:MM>   Same, but released at that clock time (tomorrow when
 awake status            Show daemon, keep-awake, screen and watch list status
                         (never starts the daemon; watch list entries are green
                         when running, red when not).
+awake list              List the watched applications (use --json for JSON).
 awake screen on         Keep the screen on (blocks screen off, screensaver and idle lock).
 awake screen on for <period>  Same, but released automatically after the period.
 awake screen off        Stop keeping the screen on.
@@ -132,6 +136,8 @@ awake daemon on         Start the background daemon.
 awake daemon off        Stop the background daemon.
 awake daemon enable     Start the daemon automatically at logon (per-user registry Run key).
 awake daemon disable    Do not start the daemon automatically at logon.
+awake log               Show or change daemon logging (on / off / level /
+                        max-files / max-size / export [path]).
 awake reload            Re-read the configuration file immediately.
 awake reset             Reset the configuration file (asks for confirmation).
 awake add <imagename>   Add an image name to the watch list.

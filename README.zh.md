@@ -34,6 +34,9 @@ awake-daemon.win64.zip   awake.exe、awake.daemon.exe、LICENSE、NOTICE
 - **屏幕保持**（`awake screen on`）：在此之上让屏幕保持常亮——阻止屏幕关闭、屏幕保护程序以及因空闲超时触发的锁屏。
 - **应用监视列表**：在 `awake.ini` 中配置的映像名；只要其中任何一个正在运行，守护进程就会以相同方式阻止空闲睡眠/休眠（每 30 秒检查一次）。
 - **守护进程开机自启**（`awake daemon enable`）：可选地在用户登录时自动启动守护进程（写入当前用户注册表 Run 键，无需管理员权限）。
+- **脚本友好输出**（`awake list`、`--json`、`--no-color` / `NO_COLOR`）：面向脚本与 CI 的纯文本与 JSON 模式。
+- **状态详情**：`awake status` 同时显示系统电源计划超时值、屏幕保护程序设置以及守护进程当前持有的电源请求。
+- **守护进程日志**（`awake log`）：可选的滚动日志文件，位于 `%LOCALAPPDATA%\awake\logs\daemon`，级别与上限可配置，并支持一键导出 zip（`awake log export`）便于附在 Issue 中。
 - 基于 ANSI 转义序列的**彩色控制台输出**。
 - 需要时客户端会自动启动守护进程（`awake 0` / `awake 1`）。
 
@@ -123,6 +126,7 @@ awake 1 until <HH:MM>   同上，但在该时刻解除（若今天已过，则�
 awake status            显示综合状态：守护进程、保持唤醒、屏幕保持和监视列表
                         （不会启动守护进程；监视列表条目绿色表示正在运行，
                         红色表示未运行）。
+awake list              列出受监视的应用程序（--json 输出 JSON）。
 awake screen on         让屏幕保持常亮（阻止屏幕关闭、屏幕保护和空闲锁屏）。
 awake screen on for <时长>  同上，但到时间自动解除。
 awake screen off        停止让屏幕保持常亮。
@@ -130,6 +134,8 @@ awake daemon on         启动后台守护进程。
 awake daemon off        停止后台守护进程。
 awake daemon enable     开启守护进程开机自启（当前用户注册表 Run 键）。
 awake daemon disable    关闭守护进程开机自启。
+awake log               显示或修改守护进程日志设置（on / off / level /
+                        max-files / max-size / export [path]）。
 awake reload            让守护进程立即重新读取配置文件。
 awake reset             重置配置文件（会要求二次确认）。
 awake add <imagename>   向监视列表添加映像名。

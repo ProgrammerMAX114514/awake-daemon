@@ -43,11 +43,14 @@
 
 import argparse
 import configparser
+import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
+import zipfile
 import winreg
 
 # ---------------------------------------------------------------------------
@@ -558,6 +561,67 @@ def test_watch_list(cfg):
           code == 0 and "not found" in out.lower(), out.strip())
 
 
+def test_list_and_output_modes(cfg):
+    # F3: the script-facing output modes.
+    run_client(cfg, ["add", "smoketest-list.exe"])
+    code, out = run_client(cfg, ["list"])
+    check("list prints the watch list entry",
+          code == 0 and "smoketest-list.exe" in out, out.strip())
+
+    code, out = run_client(cfg, ["l", "--json"])
+    try:
+        parsed = json.loads(out)
+    except ValueError:
+        parsed = None
+    check("list --json is a JSON array containing the entry",
+          isinstance(parsed, list) and "smoketest-list.exe" in parsed, out.strip())
+
+    run_client(cfg, ["del", "smoketest-list.exe"])
+
+    code, out = run_client(cfg, ["--no-color", "st"])
+    check("--no-color suppresses every ANSI escape code", chr(27) + "[" not in out)
+
+    code, out = run_client(cfg, ["--json", "st"])
+    try:
+        parsed = json.loads(out)
+    except ValueError:
+        parsed = None
+    check("--json status is a JSON object with the known keys",
+          isinstance(parsed, dict) and "daemon" in parsed and "watch" in parsed,
+          out.strip())
+
+
+def test_log_commands(cfg):
+    # F7: log settings live in awake.ini; the export packs the daemon-*.log
+    # files the running daemon has created.
+    code, out = run_client(cfg, ["log", "on"])
+    check("log on succeeds", code == 0 and "ENABLED" in out, out.strip())
+
+    code, out = run_client(cfg, ["log", "level", "debug"])
+    check("log level debug is accepted", code == 0, out.strip())
+
+    code, out = run_client(cfg, ["log", "max-files", "7"])
+    check("log max-files is accepted", code == 0, out.strip())
+    run_client(cfg, ["log", "max-files", "10"])  # restore the default
+
+    zipPath = os.path.join(tempfile.gettempdir(), "awake-smoketest-logs.zip")
+    if os.path.isfile(zipPath):
+        os.remove(zipPath)
+    code, out = run_client(cfg, ["log", "export", zipPath])
+    exported = os.path.isfile(zipPath) and zipfile.is_zipfile(zipPath)
+    check("log export creates a valid zip", code == 0 and exported,
+          out.strip() or "zip missing")
+    if exported:
+        with zipfile.ZipFile(zipPath) as archive:
+            names = [n for n in archive.namelist() if n.startswith("daemon-")]
+        check("the zip contains at least one daemon log file", len(names) >= 1)
+    if os.path.isfile(zipPath):
+        os.remove(zipPath)
+
+    code, out = run_client(cfg, ["log", "off"])
+    check("log off succeeds", code == 0 and "DISABLED" in out, out.strip())
+
+
 def test_reload_and_reset(cfg):
     code, out = run_client(cfg, ["reload"])
     check("reload is acknowledged by the running daemon",
@@ -666,6 +730,8 @@ def main():
     test_screen_keep_awake(cfg)
     test_timed_keep_awake(cfg)
     test_watch_list(cfg)
+    test_list_and_output_modes(cfg)
+    test_log_commands(cfg)
     test_reload_and_reset(cfg)
     test_autostart(cfg)
     test_daemon_shutdown(cfg)
