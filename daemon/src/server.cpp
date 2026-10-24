@@ -82,6 +82,7 @@ std::string HandleGetStatus() {
     status.version = version::kVersion;
     status.manualRemaining = daemonstate::GetManualRemaining();
     status.screenRemaining = daemonstate::GetScreenRemaining();
+    status.resumeAgo = daemonstate::GetResumeAgoSeconds();
     return protocol::SerializeStatus(status);
 }
 
