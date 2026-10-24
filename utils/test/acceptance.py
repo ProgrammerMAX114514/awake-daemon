@@ -317,9 +317,11 @@ def tier_semi(report, cfg):
     tier = "semi"
 
     # 1. Autostart round trip through the real registry.
-    codeOn, outOn = smoketest.run_client(cfg, ["daemon", "enable"])
+    codeOn, outOn = smoketest.run_client(cfg, ["daemon", "enable"],
+                                         timeout_s=cfg["autostart_timeout_s"])
     registered = smoketest.autostart_value_exists(cfg)
-    codeOff, _ = smoketest.run_client(cfg, ["daemon", "disable"])
+    codeOff, _ = smoketest.run_client(cfg, ["daemon", "disable"],
+                                      timeout_s=cfg["autostart_timeout_s"])
     gone = not smoketest.autostart_value_exists(cfg)
     if codeOn == 0 and codeOff == 0 and registered and gone:
         report.passed(tier, "autostart registry round trip")

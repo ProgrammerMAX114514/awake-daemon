@@ -76,6 +76,11 @@ def load_config(path):
         "value_name": parser.get("autostart", "value_name"),
         "restore_state": parser.getboolean("autostart", "restore_state"),
         "command_timeout_s": parser.getint("timeouts", "command_timeout_s"),
+        # Autostart commands modify the registry Run key, which antivirus
+        # software (e.g. Huorong) may intercept with an interactive prompt;
+        # those calls get a longer window (R16 lesson).
+        "autostart_timeout_s": parser.getint("timeouts", "autostart_timeout_s",
+                                             fallback=120),
     }
     cfg["client_path"] = os.path.join(cfg["release_dir"], cfg["client_exe"])
     cfg["daemon_path"] = os.path.join(cfg["release_dir"], cfg["daemon_exe"])
@@ -90,34 +95,39 @@ PASS = 0
 FAIL = 0
 
 
-def run_client(cfg, args, stdin_text=None):
-    """Runs awake.exe with the given arguments and returns (exit_code, output)."""
+def run_client(cfg, args, stdin_text=None, timeout_s=None):
+    """Runs awake.exe with the given arguments and returns (exit_code, output).
+
+    timeout_s overrides the configured command timeout (autostart commands
+    use a longer window because antivirus prompts can pause them)."""
+    effectiveTimeout = timeout_s or cfg["command_timeout_s"]
     try:
         result = subprocess.run(
             [cfg["client_path"]] + args,
             input=stdin_text,
             capture_output=True,
             text=True,
-            timeout=cfg["command_timeout_s"],
+            timeout=effectiveTimeout,
         )
     except subprocess.TimeoutExpired:
-        # A wedged daemon makes the client block forever (pipe reads have no
-        # timeout); report it instead of crashing the whole test run.
-        return 1, "TIMEOUT after %ds: awake %s" % (cfg["command_timeout_s"], " ".join(args))
+        # A wedged daemon or an unanswered antivirus prompt makes the client
+        # block; report it instead of crashing the whole test run.
+        return 1, "TIMEOUT after %ds: awake %s" % (effectiveTimeout, " ".join(args))
     return result.returncode, (result.stdout or "") + (result.stderr or "")
 
 
-def run_client_stdout(cfg, args, stdin_text=None):
+def run_client_stdout(cfg, args, stdin_text=None, timeout_s=None):
     """Like run_client, but returns stdout only - for the JSON checks, where
     warnings (which go to stderr) must not pollute the machine-readable
     output."""
+    effectiveTimeout = timeout_s or cfg["command_timeout_s"]
     try:
         result = subprocess.run(
             [cfg["client_path"]] + args,
             input=stdin_text,
             capture_output=True,
             text=True,
-            timeout=cfg["command_timeout_s"],
+            timeout=effectiveTimeout,
         )
     except subprocess.TimeoutExpired:
         return 1, "TIMEOUT after %ds: awake %s" % (cfg["command_timeout_s"], " ".join(args))
@@ -666,12 +676,12 @@ def test_reload_and_reset(cfg):
 
 
 def test_autostart(cfg):
-    code, out = run_client(cfg, ["daemon", "enable"])
+    code, out = run_client(cfg, ["daemon", "enable"], timeout_s=cfg["autostart_timeout_s"])
     check("daemon enable registers autostart",
           code == 0 and "ENABLED" in out, out.strip())
     check("registry value exists after enable", autostart_value_exists(cfg))
 
-    code, out = run_client(cfg, ["daemon", "enable"])
+    code, out = run_client(cfg, ["daemon", "enable"], timeout_s=cfg["autostart_timeout_s"])
     check("daemon enable is idempotent",
           code == 0 and "already enabled" in out.lower(), out.strip())
 
@@ -686,7 +696,7 @@ def test_autostart(cfg):
     check("status flags a stale autostart entry",
           code == 0 and "STALE" in out, out.strip())
 
-    code, out = run_client(cfg, ["daemon", "enable"])
+    code, out = run_client(cfg, ["daemon", "enable"], timeout_s=cfg["autostart_timeout_s"])
     check("re-enabling repairs a stale autostart entry",
           code == 0 and "ENABLED" in out, out.strip())
     code, out = run_client(cfg, ["st"])
@@ -694,12 +704,12 @@ def test_autostart(cfg):
           code == 0 and "Autostart:" in out and "ENABLED" in out and "STALE" not in out,
           out.strip())
 
-    code, out = run_client(cfg, ["daemon", "disable"])
+    code, out = run_client(cfg, ["daemon", "disable"], timeout_s=cfg["autostart_timeout_s"])
     check("daemon disable removes autostart",
           code == 0 and "DISABLED" in out, out.strip())
     check("registry value gone after disable", not autostart_value_exists(cfg))
 
-    code, out = run_client(cfg, ["daemon", "disable"])
+    code, out = run_client(cfg, ["daemon", "disable"], timeout_s=cfg["autostart_timeout_s"])
     check("daemon disable is idempotent",
           code == 0 and "already disabled" in out.lower(), out.strip())
 
@@ -760,7 +770,7 @@ def main():
 
     # Restore the pre-test autostart state if requested.
     if cfg["restore_state"] and autostart_before and not autostart_value_exists(cfg):
-        run_client(cfg, ["daemon", "enable"])
+        run_client(cfg, ["daemon", "enable"], timeout_s=cfg["autostart_timeout_s"])
         print("[INFO] restored the pre-test autostart state")
     if not cfg["keep_window_open"]:
         kill_test_app(cfg)  # best-effort cleanup of any leftover test app
