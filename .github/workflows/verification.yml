@@ -1,0 +1,73 @@
+# =============================================================================
+# verification.yml - R16 release hardening verification (workflow_dispatch).
+#
+# Runs the heavier, non-release-blocking verification round: the regular
+# build + unit tests + smoke test, then the stress script (concurrency storm
+# + pipe fuzzing) and a bounded soak run. Reports are uploaded as artifacts.
+#
+# The 24-hour soak and the interactive sleep/resume checks cannot run on a
+# runner - they are part of the local full pass documented in
+# utils/test/manual-checklist.md (the 1.0.0 release gate).
+# =============================================================================
+
+name: Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      soak_minutes:
+        description: 'Soak duration in minutes'
+        required: false
+        default: '10'
+  schedule:
+    # Weekly sentinel: Mondays 03:00 UTC.
+    - cron: '0 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  verification:
+    name: Hardening verification
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v6
+
+      - name: Build
+        shell: cmd
+        run: utils\build.bat
+
+      - name: Unit tests
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path build -Recurse -Filter awake_tests.exe |
+                 Select-Object -First 1
+          if (-not $exe) { throw "awake_tests.exe was not built." }
+          & $exe.FullName
+          if ($LASTEXITCODE -ne 0) { throw "Unit tests failed." }
+
+      - name: Smoke test
+        shell: pwsh
+        run: python utils\test\smoketest.py
+
+      # Concurrency storm + pipe fuzzing (R16 tier "auto").
+      - name: Stress (storm + fuzz)
+        shell: pwsh
+        run: python utils\test\stress.py --processes 8 --requests 25 --fuzz-rounds 25
+
+      # Bounded soak: F1 expiry precision, watch churn, memory trend (R16).
+      - name: Soak
+        shell: pwsh
+        run: python utils\test\soak.py --minutes ${{ github.event.inputs.soak_minutes || '10' }}
+
+      - name: Upload the verification artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: awake-verification-${{ github.run_id }}
+          path: |
+            build/Release/verification/soak-report.json
+          if-no-files-found: warn

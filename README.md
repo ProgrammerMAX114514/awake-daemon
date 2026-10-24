@@ -95,6 +95,13 @@ python utils\test\smoketest.py
 
 It exercises every command (including aliases and the autostart registry entry), driven by the config file `utils/test/smoketest.ini` (test application, registry location, timeouts). Steps that cannot be automated from a normal shell - colors, `powercfg /requests` verification, logon autostart, manual-sleep behavior - are printed as a manual checklist at the end.
 
+For the release hardening pass (R16) three more tools exist:
+
+- `utils/test/acceptance.py` - the three-tier acceptance orchestrator (`--tier auto|semi|manual|all`) producing `build/verification/report.md` and `results.json`. **The 1.0.0 gate: auto + semi green and the manual checklist signed off.**
+- `utils/test/stress.py` - concurrency storm (parallel clients) and randomized pipe fuzzing against the running daemon.
+- `utils/test/soak.py` - long-run stability verification (`--minutes 1440` for the full 24-hour pass): F1 expiry precision statistics, watch-list churn, memory trend, periodic fuzz rounds.
+- `utils/test/manual-checklist.md` - the formal manual review checklist (elevation matrix, real sleep/resume, logon autostart, clean-machine deployment, ...).
+
 Unit tests live in `tests/` (Catch2, vendored in `tests/third_party/catch2`, so no network access is needed). They are built together with the executables and cover the parts that are hard to reach through the CLI - image name validation, the line helpers of the config parser, and the wire protocol including unknown-key tolerance:
 
 ```
