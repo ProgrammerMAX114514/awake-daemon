@@ -1,0 +1,52 @@
+name: Documentation or other
+description: Report a documentation problem, or anything that does not fit the bug and feature forms
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for documentation problems and for anything else that is neither a bug report nor a feature request. Security problems belong in the private channel, not here.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of report is this?
+      options:
+        - Wrong or outdated documentation
+        - Missing documentation
+        - Unclear wording
+        - Something else (described below)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: location
+    attributes:
+      label: Where did you see it?
+      options:
+        - README.md
+        - README.zh.md
+        - CHANGELOG.md
+        - Release notes
+        - In-app help (awake help)
+        - CONTRIBUTING.md or SECURITY.md
+        - Other (write it below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What is wrong or missing?
+      description: Quote the current text when you can, and say what it should say instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Links, screenshots or additional context.
+    validations:
+      required: false

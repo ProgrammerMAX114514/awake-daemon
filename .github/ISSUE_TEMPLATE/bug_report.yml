@@ -1,0 +1,108 @@
+name: Bug report
+description: Report a problem with awake
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem. The version, the exact command and the full output usually identify the cause quickly, so please fill in as much as you can.
+
+        **Security problems must not be reported here.** Close this form and use the private channel linked at the bottom of the new issue page instead (see `SECURITY.md`).
+
+  - type: input
+    id: awake-version
+    attributes:
+      label: awake version
+      description: Run `awake version` and paste the whole line, including the git hash if present.
+      placeholder: awake 1.0.0 (git f29646f)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: windows-version
+    attributes:
+      label: Windows version
+      options:
+        - Windows 11
+        - Windows 10
+        - Windows Server
+        - Other (write it in the description below)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: elevation
+    attributes:
+      label: Was the terminal elevated?
+      description: The daemon refuses to run elevated by design, which changes the behaviour of `awake daemon on`.
+      options:
+        - No (normal user)
+        - Yes (administrator)
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: terminal
+    attributes:
+      label: Terminal
+      options:
+        - Windows Terminal
+        - Classic console (conhost)
+        - cmd.exe window
+        - PowerShell
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Describe the problem and list the exact commands you ran, in order.
+      placeholder: |
+        1. awake daemon on
+        2. awake 1 for 30m
+        3. awake status
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+      description: What did you think would happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Command output
+      description: Paste the complete output as plain text. Warnings are written to stderr, so include both streams when you can.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Daemon logs
+      description: Optional but very useful. `awake log export` writes a zip with the daemon logs; attach it to this issue or paste the relevant lines.
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues and this is not a duplicate.
+          required: true
+        - label: I ran `awake status` and pasted the relevant lines above.
+          required: false
+        - label: I ran the smoke test from a source checkout (`python utils/test/smoketest.py`) and its summary is included above.
+          required: false
