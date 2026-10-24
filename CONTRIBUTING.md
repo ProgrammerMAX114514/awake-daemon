@@ -1,71 +1,32 @@
 # Contributing to awake
 
-Thank you for your interest in contributing! This project is AI-generated
-(see the `NOTICE` file) - extra scrutiny of every contribution is very
-welcome.
+Thank you for your interest in contributing! This project is AI-generated (see the `NOTICE` file) - extra scrutiny of every contribution is very welcome.
 
 ## Getting started
 
 1. Fork/clone the repository.
-2. Build the project: `utils\build.bat` (requires Visual Studio 2026 with
-   the MSVC x64 toolset, CMake and PowerShell 7; the batch file only starts
-   `utils\build.ps1`, which finds the toolchain on its own). Custom
-   installations are supported through `utils\toolchain.ini` - copy
-   `utils\toolchain.ini.example` and adjust the paths.
-3. Run the smoke test: `python utils\test\smoketest.py` (requires Python
-   3.8+, no third-party packages). The configuration lives in
-   `utils\test\smoketest.ini`.
-4. For release hardening (R16), the verification tooling lives in
-   `utils\test\` as well: `acceptance.py` (three-tier acceptance
-   orchestrator), `stress.py` (concurrency storm + pipe fuzzing), `soak.py`
-   (long-run stability, `--minutes 1440` for the full pass) and
-   `manual-checklist.md` (the formal manual review checklist). The CI
-   "Verification" workflow runs a bounded round on demand.
+2. Build the project: `utils\build.bat` (requires Visual Studio 2026 with the MSVC x64 toolset, CMake and PowerShell 7; the batch file only starts `utils\build.ps1`, which finds the toolchain on its own). Custom installations are supported through `utils\toolchain.ini` - copy `utils\toolchain.ini.example` and adjust the paths.
+3. Run the smoke test: `python utils\test\smoketest.py` (requires Python 3.8+, no third-party packages). The configuration lives in `utils\test\smoketest.ini`.
+4. For release hardening (R16), the verification tooling lives in `utils\test\` as well: `acceptance.py` (three-tier acceptance orchestrator), `stress.py` (concurrency storm + pipe fuzzing), `soak.py` (long-run stability, `--minutes 1440` for the full pass) and `manual-checklist.md` (the formal manual review checklist). The CI "Verification" workflow runs a bounded round on demand.
 
 ## Ground rules
 
-- **License**: by contributing you agree that your changes are licensed
-  under the Apache License 2.0 (see `LICENSE`).
-- **ASCII only**: all source code, scripts and documentation must contain
-  standard ASCII characters only. The only exceptions are `README.zh.md`
-  and the generated configuration template header, which must remain
-  English/ASCII too.
-- **License headers**: every new source file needs the Apache-2.0 header
-  including the AI-generated software notice (copy it from any existing
-  file, using the comment syntax of the file type).
-- **Comments**: keep the detailed English comments that explain the "why"
-  behind non-obvious decisions, especially around the power thread and the
-  named pipe protocol.
-- **Style**: match the style of the surrounding code (4-space indent,
-  `namespace` modules, camelCase functions with a `module::` prefix).
-- **Version numbers**: the version is declared only in `CMakeLists.txt`
-  (`project(awake VERSION ...)` plus `AWAKE_VERSION_SUFFIX`). `version.h` is
-  generated from `common/include/version.h.in` during configuration - never
-  edit a version anywhere else. The smoke test verifies that the client and
-  both READMEs agree with `CMakeLists.txt`.
+- **License**: by contributing you agree that your changes are licensed under the Apache License 2.0 (see `LICENSE`).
+- **ASCII only**: all source code, scripts and documentation must contain standard ASCII characters only. The only exceptions are `README.zh.md` and the generated configuration template header, which must remain English/ASCII too.
+- **License headers**: every new source file needs the Apache-2.0 header including the AI-generated software notice (copy it from any existing file, using the comment syntax of the file type).
+- **Comments**: keep the detailed English comments that explain the "why" behind non-obvious decisions, especially around the power thread and the named pipe protocol.
+- **Style**: match the style of the surrounding code (4-space indent, `namespace` modules, camelCase functions with a `module::` prefix).
+- **Version numbers**: the version is declared only in `CMakeLists.txt` (`project(awake VERSION ...)` plus `AWAKE_VERSION_SUFFIX`). `version.h` is generated from `common/include/version.h.in` during configuration - never edit a version anywhere else. The smoke test verifies that the client and both READMEs agree with `CMakeLists.txt`.
 
 ## Commit and pull request guidelines
 
 - Keep commits focused; one logical change per commit.
-- Use the conventional style already in the log: `feat:`, `fix:`,
-  `refactor:`, `docs:`, `chore:`, `test:`.
-- Every pull request must pass the smoke test locally; include the test
-  summary (e.g. "91 passed, 0 failed") in the description. Run
-  `python utils	estcceptance.py --tier auto` for changes that touch the
-  daemon core or the wire protocol.
-- New behaviour in `common/` should come with a unit test in `tests/`
-  (Catch2 is vendored there; run `ctest --test-dir build` or the
-  `awake_tests.exe` binary). The smoke test covers the CLI end to end, the
-  unit tests cover the parsing and helper logic.
-- CI (`.github/workflows/ci.yml`) builds the project and runs the same smoke
-  test on every push and pull request; a red run blocks the merge. Releases
-  are produced by `release.yml` from a version tag - see the README for the
-  short version.
-- Changes to the wire protocol must be made in `common/include/protocol.h`
-  (single source of truth) and keep older clients working where possible -
-  `ParseStatusResponse` ignores unknown KEY=VALUE lines on purpose.
+- Use the conventional style already in the log: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `test:`.
+- Every pull request must pass the smoke test locally; include the test summary (e.g. "91 passed, 0 failed") in the description. Run `python utils	estcceptance.py --tier auto` for changes that touch the daemon core or the wire protocol.
+- New behaviour in `common/` should come with a unit test in `tests/` (Catch2 is vendored there; run `ctest --test-dir build` or the `awake_tests.exe` binary). The smoke test covers the CLI end to end, the unit tests cover the parsing and helper logic.
+- CI (`.github/workflows/ci.yml`) builds the project and runs the same smoke test on every push and pull request; a red run blocks the merge. Releases are produced by `release.yml` from a version tag - see the README for the short version.
+- Changes to the wire protocol must be made in `common/include/protocol.h` (single source of truth) and keep older clients working where possible - `ParseStatusResponse` ignores unknown KEY=VALUE lines on purpose.
 
 ## Reporting bugs
 
-Use the GitHub issue templates. For security-related issues, see
-`SECURITY.md`.
+Use the GitHub issue templates. For security-related issues, see `SECURITY.md`.

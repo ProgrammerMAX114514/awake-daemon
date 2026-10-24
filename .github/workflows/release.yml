@@ -74,7 +74,7 @@ jobs:
         run: |
           $stage = "build\stage"
           New-Item -ItemType Directory -Path $stage -Force | Out-Null
-          Copy-Item build\Release\awake.exe, build\Release\awake.daemon.exe, LICENSE, NOTICE $stage
+          Copy-Item build\Release\awake.exe, build\Release\awake.daemon.exe, LICENSE, NOTICE, README.md, README.zh.md $stage
           $sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe'
           $zip = Join-Path (Resolve-Path .).Path 'awake-daemon.win64.zip'
           if (Test-Path $sevenZip) {

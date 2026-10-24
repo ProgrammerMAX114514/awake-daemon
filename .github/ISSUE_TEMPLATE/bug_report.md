@@ -1,9 +1,4 @@
----
-name: Bug report
-about: Report a problem with awake
-title: "[Bug] "
-labels: bug
----
+--- name: Bug report about: Report a problem with awake title: "[Bug] " labels: bug ---
 
 ## Description
 

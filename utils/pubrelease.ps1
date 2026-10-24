@@ -77,7 +77,7 @@ try {
     foreach ($file in @('awake.exe', 'awake.daemon.exe')) {
         Copy-Item (Join-Path $root "build\Release\$file") $stage -Force
     }
-    foreach ($file in @('LICENSE', 'NOTICE')) {
+    foreach ($file in @('LICENSE', 'NOTICE', 'README.md', 'README.zh.md')) {
         Copy-Item (Join-Path $root $file) $stage -Force
     }
 

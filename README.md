@@ -1,10 +1,6 @@
 # awake
 
-![License](https://img.shields.io/badge/license-Apache--2.0-blue)
-![Release](https://img.shields.io/github/v/tag/ProgrammerMAX114514/awake-daemon?sort=semver&label=release)
-![CI](https://github.com/ProgrammerMAX114514/awake-daemon/actions/workflows/ci.yml/badge.svg)
-![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-blue)
-![Language](https://img.shields.io/badge/language-C%2B%2B17-blue)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue) ![Release](https://img.shields.io/github/v/tag/ProgrammerMAX114514/awake-daemon?sort=semver&label=release) ![CI](https://github.com/ProgrammerMAX114514/awake-daemon/actions/workflows/ci.yml/badge.svg) ![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-blue) ![Language](https://img.shields.io/badge/language-C%2B%2B17-blue)
 
 [English](README.md) | [简体中文](README.zh.md)
 
