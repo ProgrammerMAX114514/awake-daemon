@@ -36,6 +36,23 @@ Starting with 1.0.0 the public surface is stable:
 - CI (`.github/workflows/ci.yml`) builds the project and runs the same smoke test on every push and pull request; a red run blocks the merge. Releases are produced by `release.yml` from a version tag - see the README for the short version.
 - Changes to the wire protocol must be made in `common/include/protocol.h` (single source of truth) and keep older clients working where possible - `ParseStatusResponse` ignores unknown KEY=VALUE lines on purpose.
 
+## Branching and pull requests
+
+From 1.0.0 on, every change reaches `main` through a pull request. `main` is protected, so a direct push is refused: the branch is the place to work, the pull request is the place to review and to let CI decide.
+
+- **Branch naming**: `feat/`, `fix/`, `docs/`, `ci/`, `test/`, `chore/` followed by a short description, for example `fix/smoke-version-assert`.
+- **Flow**: commit on the branch (GPG signed) -> `git push -u origin <branch>` -> `gh pr create` -> CI must be green -> fill in the pull request template -> merge.
+- **Merge strategy: create a merge commit.** This keeps the signed commits from the branch in the history and adds a single merge commit. Squash and rebase rewrite the commits, which replaces your signature with the one GitHub applies, so use them only when collapsing a messy history is worth that trade.
+- **One person, still a pull request.** The author is also the reviewer, and that is intentional: the pull request is where CI runs, where the checklist is answered and where an AI session and a human collaborator have exactly the same boundary.
+- **Hotfixes too.** A broken `main` is fixed on a branch like everything else. The only exception is a broken workflow that prevents pull requests from running at all; then push directly, and open a pull request afterwards that documents what was done.
+- **Releases**: the tag is created on `main` after the pull request is merged, following the release steps in the README.
+
+Required before a pull request can be merged (configured as a branch protection rule on `main`):
+
+- the `CI` workflow is green (build, unit tests, smoke test, Debug unit tests, `/analyze`);
+- the branch is up to date with `main`;
+- no direct pushes, no force pushes.
+
 ## Reporting bugs
 
 Use the GitHub issue templates. For security-related issues, see `SECURITY.md`.
