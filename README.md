@@ -16,10 +16,11 @@ Current version: **0.8.0-beta-pre1.0.0**
 
 ## Download
 
-Prebuilt packages are attached to the [latest release](https://github.com/ProgrammerMAX114514/awake-daemon/releases/latest):
+Prebuilt packages are attached to every release on the [releases page](https://github.com/ProgrammerMAX114514/awake-daemon/releases) (all current releases are marked as pre-releases, so `releases/latest` will not list them):
 
 ```
-awake-daemon.win64.zip   awake.exe, awake.daemon.exe, LICENSE, NOTICE
+awake-daemon.win64.zip   awake.exe, awake.daemon.exe, LICENSE, NOTICE,
+                         README.md, README.zh.md
 ```
 
 Every release tag is GPG-signed; the release notes list the highlights, the behaviour changes and the full command list. The version history is summarized in [CHANGELOG.md](CHANGELOG.md). Extract the zip into any folder - both executables are statically linked and need no runtime or installer. Building from source is described below.
@@ -208,6 +209,10 @@ awake/
                        thread, pipe server, power event monitor, logging)
 ```
 
+The verification tooling lives in `utils/test/` (`smoketest.py`,
+`acceptance.py`, `stress.py`, `soak.py` and `manual-checklist.md`), the unit
+tests in `tests/` (Catch2).
+
 ## How it works
 
 ```
@@ -218,6 +223,8 @@ awake/
 |  commands         |  request/response          |  server (pipe loop)        |
 |  status           |                            |  state (shared flags)      |
 |  autostart        |                            |  power (30 s poll thread)  |
+|  log export       |                            |  monitor (power events)    |
+|  logging          |                            |  logging (per-day files)   |
 +-------------------+                            +----------------------------+
                                                                  |
                                                                  v

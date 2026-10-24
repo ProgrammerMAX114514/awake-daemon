@@ -16,10 +16,11 @@
 
 ## 下载
 
-预编译包挂在[最新 Release](https://github.com/ProgrammerMAX114514/awake-daemon/releases/latest)下：
+预编译包挂在[发布页](https://github.com/ProgrammerMAX114514/awake-daemon/releases)下（当前所有版本均为预发布，`releases/latest` 不会列出它们）：
 
 ```
-awake-daemon.win64.zip   awake.exe、awake.daemon.exe、LICENSE、NOTICE
+awake-daemon.win64.zip   awake.exe、awake.daemon.exe、LICENSE、NOTICE、
+                         README.md、README.zh.md
 ```
 
 每个发布 tag 都有 GPG 签名；Release 说明里列出了亮点、行为变更与完整命令表。版本历史汇总见 [CHANGELOG.md](CHANGELOG.md)。解压到任意目录即可使用——两个可执行文件均静态链接，无需运行时或安装器。从源码构建见下文。
@@ -204,6 +205,9 @@ awake/
                         管道服务、电源事件监听、日志）
 ```
 
+验证工具位于 utils/test/（smoketest.py、acceptance.py、stress.py、soak.py
+与 manual-checklist.md），单元测试位于 tests/（Catch2）。
+
 ## 工作原理
 
 ```
@@ -214,6 +218,8 @@ awake/
 |  commands (命令)  |  请求/应答协议             |  server (管道服务循环)     |
 |  status (状态)    |                            |  state (共享状态标志)      |
 |  autostart (自启) |                            |  power (30 秒轮询线程)     |
+|  log export (导出)|                            |  monitor (电源事件监听)    |
+|  logging (日志)   |                            |  logging (按日日志文件)    |
 +-------------------+                            +----------------------------+
                                                                  |
                                                                  v
