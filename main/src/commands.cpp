@@ -363,8 +363,8 @@ static bool ParseMajorVersion(const std::string& version, int& majorOut) {
 bool cli::CheckDaemonVersion(const std::string& daemonVersion) {
     if (daemonVersion.empty()) {
         // Very old daemons did not report a version; accept but warn.
-        console::PrintLine(console::kColorYellow,
-                           "Warning: the daemon did not report its version; it may be outdated.");
+        console::PrintErrLine(console::kColorYellow,
+                              "Warning: the daemon did not report its version; it may be outdated.");
         return true;
     }
     if (daemonVersion == version::kVersion) {
@@ -376,16 +376,16 @@ bool cli::CheckDaemonVersion(const std::string& daemonVersion) {
     const bool parsed = ParseMajorVersion(version::kVersion, clientMajor) &&
                         ParseMajorVersion(daemonVersion, daemonMajor);
     if (parsed && clientMajor != daemonMajor) {
-        console::Printf(console::kColorRed,
-                        "Error: version mismatch - client %s, daemon %s. "
-                        "Please update both executables from the same release.\n",
-                        version::kVersion, daemonVersion.c_str());
+        const std::string message = std::string("Error: version mismatch - client ") +
+                                    version::kVersion + ", daemon " + daemonVersion +
+                                    ". Please update both executables from the same release.";
+        console::PrintErrLine(console::kColorRed, message.c_str());
         return false;
     }
-    console::Printf(console::kColorYellow,
-                    "Warning: version mismatch - client %s, daemon %s. "
-                    "Some features may not work correctly.\n",
-                    version::kVersion, daemonVersion.c_str());
+    const std::string warning = std::string("Warning: version mismatch - client ") +
+                                version::kVersion + ", daemon " + daemonVersion +
+                                ". Some features may not work correctly.";
+    console::PrintErrLine(console::kColorYellow, warning.c_str());
     return true;
 }
 

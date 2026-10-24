@@ -124,6 +124,14 @@ void PrintLine(const char* color, const char* text) {
     Printf(color, "%s\n", text);
 }
 
+// Warnings go to STDERR so that machine-readable stdout (--json) stays
+// clean even when the environment triggers a warning (F3).
+void PrintErrLine(const char* color, const char* text) {
+    std::fprintf(stderr, "%s%s%s\n",
+                 g_colorsEnabled ? color : "", text,
+                 g_colorsEnabled ? kColorReset : "");
+}
+
 void Printf(const char* color, const char* fmt, ...) {
     std::va_list args;
     va_start(args, fmt);

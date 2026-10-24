@@ -56,6 +56,10 @@ bool ColorsEnabled();
 // Prints a single colored line, appending a trailing newline.
 void PrintLine(const char* color, const char* text);
 
+// Prints a single colored line to STDERR (warnings and notices that must
+// not pollute machine-readable stdout output; F3).
+void PrintErrLine(const char* color, const char* text);
+
 // Prints colored text using printf-style formatting (no trailing newline).
 // Implemented with vprintf, so the usual format specifiers apply.
 void Printf(const char* color, const char* fmt, ...);

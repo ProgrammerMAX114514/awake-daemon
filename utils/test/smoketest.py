@@ -102,6 +102,20 @@ def run_client(cfg, args, stdin_text=None):
     return result.returncode, (result.stdout or "") + (result.stderr or "")
 
 
+def run_client_stdout(cfg, args, stdin_text=None):
+    """Like run_client, but returns stdout only - for the JSON checks, where
+    warnings (which go to stderr) must not pollute the machine-readable
+    output."""
+    result = subprocess.run(
+        [cfg["client_path"]] + args,
+        input=stdin_text,
+        capture_output=True,
+        text=True,
+        timeout=cfg["command_timeout_s"],
+    )
+    return result.returncode, result.stdout or ""
+
+
 ANSI_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
 
 
@@ -568,7 +582,7 @@ def test_list_and_output_modes(cfg):
     check("list prints the watch list entry",
           code == 0 and "smoketest-list.exe" in out, out.strip())
 
-    code, out = run_client(cfg, ["l", "--json"])
+    code, out = run_client_stdout(cfg, ["l", "--json"])
     try:
         parsed = json.loads(out)
     except ValueError:
@@ -581,7 +595,7 @@ def test_list_and_output_modes(cfg):
     code, out = run_client(cfg, ["--no-color", "st"])
     check("--no-color suppresses every ANSI escape code", chr(27) + "[" not in out)
 
-    code, out = run_client(cfg, ["--json", "st"])
+    code, out = run_client_stdout(cfg, ["--json", "st"])
     try:
         parsed = json.loads(out)
     except ValueError:

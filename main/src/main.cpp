@@ -161,8 +161,9 @@ static int RunCommand(int originalArgc, char** originalArgv) {
     // non-elevated shell, which looks like "the process runs but does not
     // respond". The warning is informational: it never blocks the command.
     if (privilege::IsProcessElevated()) {
-        console::PrintLine(console::kColorYellow,
-                           "Warning: awake is running elevated; a daemon started from here cannot be controlled by a non-elevated shell.");
+        // stderr: warnings must not pollute machine-readable stdout (--json).
+        console::PrintErrLine(console::kColorYellow,
+                              "Warning: awake is running elevated; a daemon started from here cannot be controlled by a non-elevated shell.");
     }
 
     // No arguments behaves like "help".
