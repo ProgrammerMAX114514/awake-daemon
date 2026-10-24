@@ -39,6 +39,10 @@ namespace {
 
 std::mutex g_mutex;              // guards everything below
 
+// Diagnostic trace set by ReloadFromConfig under the lock, emitted by
+// Write() after that lock has been released (R16 wedge diagnostics).
+std::string g_traceAfterUnlock;
+
 bool g_enabled = false;          // log_enabled
 bool g_debugEnabled = false;     // log_level == "debug"
 unsigned int g_maxFiles = 10;    // log_max_files (rolling limit)
@@ -221,6 +225,17 @@ void ReloadFromConfig() {
             g_enabled = false; // cannot create the file: stay disabled
         }
     }
+
+    // Diagnostic trace (R16): ReloadFromConfig runs on the server thread and
+    // was the last thing in the log when a wedge was once observed. The
+    // trace is built under the lock and emitted after releasing it (Write
+    // would self-deadlock otherwise).
+    const std::string trace =
+        "log settings reloaded: enabled=" + std::string(g_enabled ? "1" : "0") +
+        " level=" + (g_debugEnabled ? "debug" : "info") +
+        " maxFiles=" + std::to_string(g_maxFiles) +
+        " file=" + (g_currentFile.empty() ? "<none>" : g_currentFile);
+    g_traceAfterUnlock = trace;
 }
 
 std::string LogDirectory() {
@@ -235,6 +250,11 @@ bool Enabled() {
 
 void Write(const char* level, const std::string& message) {
     std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_traceAfterUnlock.empty()) {
+        // Emit the pending reload trace first (never filtered by level).
+        AppendLine(g_traceAfterUnlock);
+        g_traceAfterUnlock.clear();
+    }
     if (!g_enabled || g_currentFile.empty()) {
         return;
     }

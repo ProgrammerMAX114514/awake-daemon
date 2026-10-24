@@ -92,13 +92,18 @@ FAIL = 0
 
 def run_client(cfg, args, stdin_text=None):
     """Runs awake.exe with the given arguments and returns (exit_code, output)."""
-    result = subprocess.run(
-        [cfg["client_path"]] + args,
-        input=stdin_text,
-        capture_output=True,
-        text=True,
-        timeout=cfg["command_timeout_s"],
-    )
+    try:
+        result = subprocess.run(
+            [cfg["client_path"]] + args,
+            input=stdin_text,
+            capture_output=True,
+            text=True,
+            timeout=cfg["command_timeout_s"],
+        )
+    except subprocess.TimeoutExpired:
+        # A wedged daemon makes the client block forever (pipe reads have no
+        # timeout); report it instead of crashing the whole test run.
+        return 1, "TIMEOUT after %ds: awake %s" % (cfg["command_timeout_s"], " ".join(args))
     return result.returncode, (result.stdout or "") + (result.stderr or "")
 
 
@@ -106,13 +111,16 @@ def run_client_stdout(cfg, args, stdin_text=None):
     """Like run_client, but returns stdout only - for the JSON checks, where
     warnings (which go to stderr) must not pollute the machine-readable
     output."""
-    result = subprocess.run(
-        [cfg["client_path"]] + args,
-        input=stdin_text,
-        capture_output=True,
-        text=True,
-        timeout=cfg["command_timeout_s"],
-    )
+    try:
+        result = subprocess.run(
+            [cfg["client_path"]] + args,
+            input=stdin_text,
+            capture_output=True,
+            text=True,
+            timeout=cfg["command_timeout_s"],
+        )
+    except subprocess.TimeoutExpired:
+        return 1, "TIMEOUT after %ds: awake %s" % (cfg["command_timeout_s"], " ".join(args))
     return result.returncode, result.stdout or ""
 
 

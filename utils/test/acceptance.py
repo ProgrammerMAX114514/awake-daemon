@@ -88,6 +88,9 @@ class Report:
     def skipped(self, tier, name, detail=""):
         self.record(tier, name, "SKIP", detail)
 
+    def anomaly(self, text):
+        self.checks.append({"tier": "-", "name": text, "status": "WARN", "detail": ""})
+
     def failCount(self):
         return sum(1 for c in self.checks if c["status"] == "FAIL")
 
@@ -184,7 +187,9 @@ def tier_auto(report, cfg):
         else:
             report.failed(tier, "unit tests", summary)
 
-    # 4. Smoke test (as a subprocess - it mutates state heavily).
+    # 4. Smoke test (as a subprocess - it mutates state heavily). Its own
+    # helpers are timeout-resilient, so a wedged daemon degrades to FAILs
+    # instead of a crash; the detail carries stderr for the traceback.
     result = subprocess.run([sys.executable, os.path.join(SCRIPT_DIR, "smoketest.py")],
                             capture_output=True, text=True)
     match = re.search(r"Summary: (\d+) passed, (\d+) failed", result.stdout)
@@ -192,8 +197,9 @@ def tier_auto(report, cfg):
         report.passed(tier, "smoke test",
                       "%s passed, %s failed" % (match.group(1), match.group(2)))
     else:
+        detail = result.stderr.strip()[-200:] or result.stdout.strip()[-200:]
         report.failed(tier, "smoke test",
-                      (match.group(0) if match else result.stdout[-200:]))
+                      (match.group(0) if match else detail))
 
     # 5. Stress (storm + fuzz) as a subprocess - isolated crash domain.
     result = subprocess.run([sys.executable, os.path.join(SCRIPT_DIR, "stress.py"),
@@ -209,26 +215,31 @@ def tier_auto(report, cfg):
     latencies = []
     precisionFailures = 0
     for cycle in range(10):
-        started = time.time()
-        code, _ = smoketest.run_client(cfg, ["1", "for", "3s"])
-        if code != 0:
+        try:
+            started = time.time()
+            code, _ = smoketest.run_client(cfg, ["1", "for", "3s"])
+            if code != 0:
+                precisionFailures += 1
+                continue
+            releasedAt = None
+            deadline = started + 3 + 2.5 + 5
+            while time.time() < deadline:
+                code, out = smoketest.run_client_stdout(cfg, ["--json", "st"])
+                try:
+                    if not json.loads(out)["keepAwake"]["active"]:
+                        releasedAt = time.time()
+                        break
+                except (ValueError, KeyError):
+                    pass
+                time.sleep(0.2)
+            if releasedAt is None:
+                precisionFailures += 1
+                continue
+            latencies.append(releasedAt - started)
+        except subprocess.TimeoutExpired:
+            # A wedged daemon must not crash the acceptance run (R16 lesson).
             precisionFailures += 1
-            continue
-        releasedAt = None
-        deadline = started + 3 + 2.5 + 5
-        while time.time() < deadline:
-            code, out = smoketest.run_client_stdout(cfg, ["--json", "st"])
-            try:
-                if not json.loads(out)["keepAwake"]["active"]:
-                    releasedAt = time.time()
-                    break
-            except (ValueError, KeyError):
-                pass
-            time.sleep(0.2)
-        if releasedAt is None:
-            precisionFailures += 1
-            continue
-        latencies.append(releasedAt - started)
+            report.anomaly("F1 cycle %d: client timed out (daemon wedged?)" % cycle)
     if latencies and precisionFailures == 0 and min(latencies) >= 2.9 \
             and max(latencies) <= 5.5:
         report.passed(tier, "F1 expiry precision (10 cycles)",
