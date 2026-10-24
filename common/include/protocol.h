@@ -85,6 +85,10 @@ struct DaemonStatus {
     // also what a daemon without timer support reports), 0 means "not set".
     int manualRemaining = -1;
     int screenRemaining = -1;
+    // Seconds since the daemon last saw a resume from sleep/hibernation
+    // (F13): -1 = no resume recorded since the daemon started. Daemons
+    // without F13 support never send the key.
+    int resumeAgo = -1;
 };
 
 // Serializes a DaemonStatus into the GET_STATUS response body, starting

@@ -70,6 +70,7 @@ std::string SerializeStatus(const DaemonStatus& status) {
     response += "VERSION=" + status.version + "\n";
     response += "MANUAL_REMAIN=" + std::to_string(status.manualRemaining) + "\n";
     response += "SCREEN_REMAIN=" + std::to_string(status.screenRemaining) + "\n";
+    response += "RESUME_AGO=" + std::to_string(status.resumeAgo) + "\n";
     return response;
 }
 
@@ -102,6 +103,8 @@ bool ParseStatusResponse(const std::string& response, DaemonStatus& status) {
             status.manualRemaining = std::atoi(line.c_str() + 14);
         } else if (line.compare(0, 14, "SCREEN_REMAIN=") == 0) {
             status.screenRemaining = std::atoi(line.c_str() + 14);
+        } else if (line.compare(0, 11, "RESUME_AGO=") == 0) {
+            status.resumeAgo = std::atoi(line.c_str() + 11);
         }
         if (lineEnd == response.size()) {
             break;

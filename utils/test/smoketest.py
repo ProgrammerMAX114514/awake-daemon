@@ -690,6 +690,8 @@ def main():
     print("     the daemon process is running afterwards ('awake status').")
     print("  4. Manual sleep (power button / Start menu) still works while keep-awake")
     print("     is enabled - idle sleep is blocked, manual sleep is not.")
+    print("  5. Sleep and wake the machine while keep-awake is on: 'awake status'")
+    print("     then shows a 'Last resume' line and the state is still applied.")
     print("  5. Elevation warning: run 'awake status' from an ELEVATED terminal and")
     print("     confirm the yellow one-line warning appears (and that the command")
     print("     still runs). 'awake status' shows 'running (elevated)' for an")

@@ -176,3 +176,43 @@ TEST_CASE("remain seconds round trip through the status response",
     REQUIRE(received.manualRemaining == 3725);
     REQUIRE(received.screenRemaining == -1);
 }
+
+// -----------------------------------------------------------------------------
+// Power event awareness (F13)
+// -----------------------------------------------------------------------------
+
+TEST_CASE("resumeAgo round trips through the status response", "[protocol]") {
+    protocol::DaemonStatus sent;
+    sent.resumeAgo = 3725; // 1h2m5s since the last resume
+    const std::string body = protocol::SerializeStatus(sent);
+
+    protocol::DaemonStatus received;
+    REQUIRE(protocol::ParseStatusResponse(body, received));
+    REQUIRE(received.resumeAgo == 3725);
+}
+
+TEST_CASE("resumeAgo -1 (no resume recorded) round trips", "[protocol]") {
+    protocol::DaemonStatus sent; // default resumeAgo = -1
+    const std::string body = protocol::SerializeStatus(sent);
+    REQUIRE(body.find("RESUME_AGO=-1\n") != std::string::npos);
+
+    protocol::DaemonStatus received;
+    REQUIRE(protocol::ParseStatusResponse(body, received));
+    REQUIRE(received.resumeAgo == -1);
+}
+
+TEST_CASE("a daemon without F13 keeps resumeAgo at -1", "[protocol]") {
+    protocol::DaemonStatus status;
+    // A response without the RESUME_AGO key (older daemon) must not change
+    // the default.
+    REQUIRE(protocol::ParseStatusResponse("OK\nMANUAL=1\n", status));
+    REQUIRE(status.resumeAgo == -1);
+}
+
+TEST_CASE("a malformed RESUME_AGO value degrades to 0, not a crash",
+          "[protocol]") {
+    protocol::DaemonStatus status;
+    REQUIRE(protocol::ParseStatusResponse("OK\nRESUME_AGO=\n", status));
+    // atoi("") == 0; acceptable degradation for a malformed line.
+    REQUIRE(status.resumeAgo == 0);
+}

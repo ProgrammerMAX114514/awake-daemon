@@ -132,6 +132,17 @@ int cli::CmdStatus() {
                         " (the screen may turn off on idle).\n");
     }
 
+    // Power event awareness (F13): shown once the daemon has seen a resume;
+    // daemons without F13 never report the field (it stays -1).
+    if (info.resumeAgo >= 0) {
+        console::Printf(console::kColorReset, "Last resume:");
+        console::Printf(console::kColorGreen, "%s ago",
+                        timeparse::FormatDuration(
+                            static_cast<unsigned int>(info.resumeAgo)).c_str());
+        console::Printf(console::kColorReset,
+                        " (the state was re-applied after system sleep).\n");
+    }
+
     // Daemon autostart state comes from the registry (per-user Run key).
     // A stale entry (the registered daemon exe no longer exists, e.g. the
     // folder was moved) is called out with a repair hint.
