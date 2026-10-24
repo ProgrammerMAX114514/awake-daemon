@@ -69,6 +69,16 @@ bool ExpireTimers();
 // waiting for the next 30 second poll.
 unsigned long long MillisecondsUntilExpiry();
 
+// Power event awareness (F13): called by the power monitor thread when the
+// system resumes from sleep/hibernation. Records the resume time (monotonic
+// GetTickCount64) and wakes the power thread so it re-applies the execution
+// state immediately.
+void RecordResume();
+
+// Seconds since the last recorded resume, or -1 when nothing was recorded
+// since the daemon started. Read by GET_STATUS and shown by "awake status".
+int GetResumeAgoSeconds();
+
 // True while a watched application is currently running. Only the power
 // thread writes this (it owns the process scan results); the server thread
 // only reads it for GET_STATUS.

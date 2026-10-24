@@ -132,6 +132,7 @@ target_link_libraries(awake PRIVATE awake_common)
 add_executable(awake.daemon
     daemon/src/main.cpp
     daemon/src/state.cpp
+    daemon/src/monitor.cpp
     daemon/src/power.cpp
     daemon/src/server.cpp
 )

@@ -39,6 +39,11 @@ bool   g_exitRequested = false;   // set by the SHUTDOWN command
 ULONGLONG g_manualDeadline = 0;
 ULONGLONG g_screenDeadline = 0;
 
+// GetTickCount64() of the last recorded resume from sleep/hibernation (F13);
+// 0 = no resume recorded since the daemon started. Written by the power
+// monitor thread (window message), read by GET_STATUS.
+ULONGLONG g_lastResumeTick = 0;
+
 // Turns a period in seconds into a deadline; 0 stays 0 (no expiry).
 ULONGLONG DeadlineFromNow(unsigned int seconds) {
     if (seconds == 0) {
@@ -179,6 +184,26 @@ void SetAppActive(bool active) {
     EnterCriticalSection(&g_lock);
     g_appKeepAwake = active;
     LeaveCriticalSection(&g_lock);
+}
+
+void RecordResume() {
+    EnterCriticalSection(&g_lock);
+    g_lastResumeTick = GetTickCount64();
+    LeaveCriticalSection(&g_lock);
+    // The power thread re-applies the execution state right away: display
+    // requirements and the F1 timer bookkeeping are refreshed on resume.
+    SetEvent(g_wakeEvent);
+}
+
+int GetResumeAgoSeconds() {
+    EnterCriticalSection(&g_lock);
+    const ULONGLONG tick = g_lastResumeTick;
+    LeaveCriticalSection(&g_lock);
+    if (tick == 0) {
+        return -1; // no resume recorded since the daemon started
+    }
+    const ULONGLONG now = GetTickCount64();
+    return static_cast<int>((now > tick) ? ((now - tick) / 1000ULL) : 0ULL);
 }
 
 bool GetExitRequested() {

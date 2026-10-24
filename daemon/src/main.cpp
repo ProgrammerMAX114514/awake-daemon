@@ -38,6 +38,7 @@
 #include "config.h"
 #include "console.h"
 #include "ipc.h"
+#include "monitor.h"
 #include "power.h"
 #include "privilege.h"
 #include "server.h"
@@ -93,11 +94,17 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // Watch system power events (sleep/resume); on resume the power thread
+    // re-applies the execution state immediately (F13).
+    monitor::StartPowerMonitor();
+
     // Serve clients until SHUTDOWN arrives.
     server::RunPipeServer();
 
-    // Stop the power thread (it resets the execution state on its way out)
-    // and tear everything down.
+    // Stop the power monitor first so no resume event lands during teardown,
+    // then stop the power thread (it resets the execution state on its way
+    // out) and tear everything down.
+    monitor::StopPowerMonitor();
     power::StopPowerThread(powerThread);
     daemonstate::Shutdown();
 
