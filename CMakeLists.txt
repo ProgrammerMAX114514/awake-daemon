@@ -87,8 +87,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 # Enable a high warning level on MSVC.
+#
+# R9 strictness switches (both opt-in so the everyday build stays fast and
+# quiet; the CI "static analysis" job turns /analyze on, and R16 decides
+# when /analyze findings or /WX gate a release):
+#   AWAKE_ENABLE_ANALYZE     run the MSVC static analyzer (/analyze)
+#   AWAKE_WARNINGS_AS_ERRORS treat any compiler warning as an error (/WX)
 if(MSVC)
     add_compile_options(/W4 /permissive-)
+    if(AWAKE_ENABLE_ANALYZE)
+        add_compile_options(/analyze)
+    endif()
+    if(AWAKE_WARNINGS_AS_ERRORS)
+        add_compile_options(/WX)
+    endif()
 endif()
 
 # -----------------------------------------------------------------------------

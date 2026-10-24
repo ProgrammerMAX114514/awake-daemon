@@ -77,6 +77,31 @@ jobs:
         shell: pwsh
         run: python utils\test\smoketest.py
 
+      # R9: the Debug configuration carries the same tests with assertions
+      # enabled; the Release build above may fold them away.
+      - name: Unit tests (Debug build)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . utils\msvc-env.ps1
+          $cmake = Get-CMakeCommand
+          $vsRoot = Get-VisualStudioRoot
+          $generator = Get-CMakeGenerator -VisualStudioRoot $vsRoot
+          $platform = Get-ToolSetting -Section 'generator' -Key 'platform'
+          if (-not $platform) { $platform = 'x64' }
+          if ($generator -eq 'NMake Makefiles') {
+            cmake -S . -B build-debug -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug
+            cmake --build build-debug
+          } else {
+            cmake -S . -B build-debug -G $generator -A $platform -DCMAKE_BUILD_TYPE=Debug
+            cmake --build build-debug --config Debug
+          }
+          $exe = Get-ChildItem -Path build-debug -Recurse -Filter awake_tests.exe |
+                 Select-Object -First 1
+          if (-not $exe) { throw "awake_tests.exe (Debug) was not built." }
+          & $exe.FullName
+          if ($LASTEXITCODE -ne 0) { throw "Debug unit tests failed." }
+
       - name: Upload the executables
         if: always()
         uses: actions/upload-artifact@v6
@@ -86,3 +111,32 @@ jobs:
             build/Release/awake.exe
             build/Release/awake.daemon.exe
           if-no-files-found: warn
+
+  # R9: an advisory job that builds the tree with the MSVC static analyzer
+  # enabled. Findings appear in the job log without failing the build; R16
+  # (release hardening) decides when analyzer findings gate a release.
+  analyze:
+    name: Static analysis (/analyze)
+    runs-on: windows-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v6
+
+      - name: Build with /analyze
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . utils\msvc-env.ps1
+          $cmake = Get-CMakeCommand
+          $vsRoot = Get-VisualStudioRoot
+          $generator = Get-CMakeGenerator -VisualStudioRoot $vsRoot
+          $platform = Get-ToolSetting -Section 'generator' -Key 'platform'
+          if (-not $platform) { $platform = 'x64' }
+          if ($generator -eq 'NMake Makefiles') {
+            throw "The /analyze job needs the Visual Studio generator."
+          }
+          cmake -S . -B build-analyze -DCMAKE_BUILD_TYPE=Release -DAWAKE_ENABLE_ANALYZE=ON -G $generator -A $platform
+          cmake --build build-analyze --config Release
+
