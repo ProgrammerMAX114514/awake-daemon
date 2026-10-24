@@ -120,6 +120,9 @@ void ResolveLogFile(bool forceNew) {
 
     const std::string today = TodayStamp();
     if (!forceNew && !g_currentFile.empty() && g_currentDay == today) {
+        // Still today's file - but the max-files setting may have changed
+        // via RELOAD, so the pruning runs on every resolve anyway.
+        PruneOldLogs();
         return; // keep appending to the current file
     }
 
