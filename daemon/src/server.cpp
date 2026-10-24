@@ -198,9 +198,19 @@ void RunPipeServer() {
         // A single pipe instance is enough for this tool. A second client
         // that arrives while one is being served receives ERROR_PIPE_BUSY
         // and waits via WaitNamedPipe (handled in ipc.cpp).
+        // R3 hardening:
+        //   FILE_FLAG_FIRST_PIPE_INSTANCE - refuse to attach to a pipe name
+        //     that already exists (a squatter pre-creating
+        //     "\\.\pipe\awake_daemon" could otherwise steal client
+        //     connections). The single-instance mutex is the first guard;
+        //     this is defense in depth. A failure (e.g. a foreign pipe holds
+        //     the name) is handled by the retry loop below.
+        //   PIPE_REJECT_REMOTE_CLIENTS - the tool is local-only; reject
+        //     connection attempts from remote machines.
         HANDLE pipe = CreateNamedPipeA(ipc::kPipeName,
-                                       PIPE_ACCESS_DUPLEX,
-                                       PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
+                                       PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE,
+                                       PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT |
+                                       PIPE_REJECT_REMOTE_CLIENTS,
                                        1,      // one instance at a time
                                        4096,   // output buffer
                                        4096,   // input buffer
