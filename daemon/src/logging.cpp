@@ -47,6 +47,7 @@ unsigned long long g_maxBytes =  // log_max_size_mb, as bytes
 
 std::string g_directory;         // ...\awake\logs\daemon
 std::string g_currentFile;       // absolute path of the active log file
+std::string g_currentDay;        // YYYYMMDD the current file belongs to
 unsigned long long g_currentSize = 0;
 
 // Reads one [settings] key with a default when it is missing.
@@ -58,9 +59,6 @@ std::string ReadStringSetting(const char* key, const std::string& fallback) {
     return value;
 }
 
-// Creates "<dir>\daemon-<timestamp>.log" and prunes older files so that at
-// most maxFiles daemon-*.log files remain (newest first, timestamp names sort
-// chronologically). Returns the new file path or an empty string on failure.
 // Creates every missing directory level of the path (CreateDirectoryA only
 // creates the final level, and the log path is three levels deep).
 void CreateDirectoryChain(const std::string& directory) {
@@ -74,50 +72,90 @@ void CreateDirectoryChain(const std::string& directory) {
     CreateDirectoryA(directory.c_str(), NULL);
 }
 
-std::string OpenNewLogFile() {
+// Returns today's date as "YYYYMMDD" - the log file name is per DAY, so
+// restarts on the same day append to the same file instead of scattering
+// one file per start.
+std::string TodayStamp() {
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    char stamp[16] = { 0 };
+    sprintf_s(stamp, "%04u%02u%02u", st.wYear, st.wMonth, st.wDay);
+    return std::string(stamp);
+}
+
+// Prunes older daemon-*.log files so that at most maxFiles remain (names
+// sort chronologically: per-day names first, then timestamped size-rollover
+// files of the same day).
+void PruneOldLogs() {
+    const std::string pattern = g_directory + "\\daemon-*.log";
+    WIN32_FIND_DATAA found;
+    HANDLE handle = FindFirstFileA(pattern.c_str(), &found);
+    if (handle == INVALID_HANDLE_VALUE) {
+        return;
+    }
+    std::vector<std::string> logs;
+    do {
+        if (!(found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+            logs.push_back(g_directory + "\\" + found.cFileName);
+        }
+    } while (FindNextFileA(handle, &found));
+    FindClose(handle);
+    if (logs.size() > g_maxFiles) {
+        std::sort(logs.begin(), logs.end());
+        for (size_t i = 0; i + g_maxFiles < logs.size(); ++i) {
+            DeleteFileA(logs[i].c_str());
+        }
+    }
+}
+
+// Makes sure g_currentFile points at the file new lines belong to: today's
+// daemon-YYYYMMDD.log (appended across daemon restarts) or, after a size
+// rollover, a timestamped continuation file of the same day. Caller holds
+// g_mutex. forceNew rolls to a fresh timestamped file (size limit hit).
+void ResolveLogFile(bool forceNew) {
     if (g_directory.empty()) {
-        return std::string();
+        return;
     }
     CreateDirectoryChain(g_directory);
 
-    SYSTEMTIME st;
-    GetLocalTime(&st);
-    char name[64] = { 0 };
-    sprintf_s(name, "daemon-%04u%02u%02u-%02u%02u%02u.log",
-              st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+    const std::string today = TodayStamp();
+    if (!forceNew && !g_currentFile.empty() && g_currentDay == today) {
+        return; // keep appending to the current file
+    }
+
+    std::string name = "daemon-" + today + ".log";
+    if (forceNew) {
+        SYSTEMTIME st;
+        GetLocalTime(&st);
+        char suffix[32] = { 0 };
+        sprintf_s(suffix, "-%02u%02u%02u", st.wHour, st.wMinute, st.wSecond);
+        name = "daemon-" + today + suffix + ".log";
+    }
     const std::string path = g_directory + "\\" + name;
 
     std::ofstream file(path.c_str(), std::ios::binary | std::ios::app);
     if (!file.is_open()) {
-        return std::string();
+        return; // cannot open: keep the old target; retried on the next write
     }
     file.close();
 
-    // Rolling limit: collect every daemon-*.log and delete the oldest ones
-    // beyond the configured count.
-    const std::string pattern = g_directory + "\\daemon-*.log";
-    WIN32_FIND_DATAA found;
-    HANDLE handle = FindFirstFileA(pattern.c_str(), &found);
-    if (handle != INVALID_HANDLE_VALUE) {
-        std::vector<std::string> logs;
-        do {
-            if (!(found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
-                logs.push_back(g_directory + "\\" + found.cFileName);
-            }
-        } while (FindNextFileA(handle, &found));
-        FindClose(handle);
-        if (logs.size() > g_maxFiles) {
-            std::sort(logs.begin(), logs.end()); // names sort chronologically
-            for (size_t i = 0; i + g_maxFiles < logs.size(); ++i) {
-                DeleteFileA(logs[i].c_str());
-            }
-        }
+    g_currentFile = path;
+    g_currentDay = today;
+
+    // Track the actual size of the file we just attached to.
+    WIN32_FILE_ATTRIBUTE_DATA attributes;
+    g_currentSize = 0;
+    if (GetFileAttributesExA(path.c_str(), GetFileExInfoStandard, &attributes)) {
+        g_currentSize = (static_cast<unsigned long long>(attributes.nFileSizeHigh) << 32) |
+                        attributes.nFileSizeLow;
     }
-    return path;
+
+    PruneOldLogs();
 }
 
 // Appends one finished line to the current file, rolling it over when it has
-// outgrown the size limit. Caller holds g_mutex and logging is enabled.
+// outgrown the size limit or the day has changed. Caller holds g_mutex and
+// logging is enabled.
 void AppendLine(const std::string& line) {
     // Open in append mode so exports always see a complete file even while
     // the daemon is running.
@@ -130,13 +168,10 @@ void AppendLine(const std::string& line) {
 
     g_currentSize += line.size();
     if (g_currentSize >= g_maxBytes) {
-        // Size limit reached: start a fresh file (which also applies the
-        // rolling limit to the old ones).
-        const std::string newFile = OpenNewLogFile();
-        if (!newFile.empty()) {
-            g_currentFile = newFile;
-            g_currentSize = 0;
-        }
+        // Size limit reached: roll to a fresh timestamped continuation file
+        // (which also applies the rolling limit to the old ones).
+        ResolveLogFile(true);
+        g_currentSize = 0;
     }
 }
 
@@ -175,14 +210,11 @@ void ReloadFromConfig() {
         g_directory = std::string(localAppData) + "\\awake\\logs\\daemon";
     }
 
-    if (g_enabled && g_currentFile.empty()) {
-        // Logging was just switched on (or the daemon just started): create
-        // the first file of this session.
-        const std::string newFile = OpenNewLogFile();
-        if (!newFile.empty()) {
-            g_currentFile = newFile;
-            g_currentSize = 0;
-        } else {
+    if (g_enabled) {
+        // Attach to today's log file (or open it when this is the first
+        // write of the day). Restarts on the same day keep appending.
+        ResolveLogFile(false);
+        if (g_currentFile.empty()) {
             g_enabled = false; // cannot create the file: stay disabled
         }
     }
