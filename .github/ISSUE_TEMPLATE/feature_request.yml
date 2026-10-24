@@ -1,0 +1,63 @@
+name: Feature request
+description: Suggest a feature or an improvement for awake
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. The most useful requests describe the workflow that is currently awkward, not only the command you would like to type.
+
+        Note that the command line and the wire protocol are covered by a compatibility promise since 1.0.0: additions are welcome, while removing or renaming existing commands requires a major version.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the situation where awake is inconvenient today, and what you end up doing instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should happen? If you have a command syntax in mind, write it exactly as you would type it.
+      placeholder: |
+        awake 1 for 30m --screen
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about, including how similar tools solve this.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of awake does this touch?
+      options:
+        - Command line
+        - Configuration file (awake.ini)
+        - Status output
+        - Keep-awake behaviour
+        - Logging
+        - Autostart
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues and this is not a duplicate.
+          required: true
+        - label: This request is about the tool itself, not about a specific machine's power settings.
+          required: false

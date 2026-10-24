@@ -9,9 +9,11 @@ What does this pull request change and why?
 - [ ] Breaking change (fix or feature that changes existing behavior)
 - [ ] Refactoring (no functional change)
 - [ ] Documentation
+- [ ] CI, release or repository configuration
 
 ## Checklist
 
+- [ ] CI is green (`Build and smoke test` and `Static analysis (/analyze)`); main requires both, and the branch must be up to date.
 - [ ] `utils\build.bat` builds cleanly (/W4, no new warnings).
 - [ ] `python utils\test\smoketest.py` passes - summary:
 - [ ] New/changed source files carry the Apache-2.0 header with the AI-generated notice.
@@ -22,3 +24,5 @@ What does this pull request change and why?
 ## Additional notes
 
 Anything reviewers should look at specifically (for example power thread or named pipe behavior).
+
+> **Merge with "Create a merge commit"**, not squash or rebase: that keeps the signed commits from the branch in the history. See the "Branching and pull requests" section of `CONTRIBUTING.md`.

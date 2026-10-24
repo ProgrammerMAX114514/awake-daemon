@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/ProgrammerMAX114514/awake-daemon/security/advisories/new
+    about: Do not open a public issue for a security problem. Use a private security advisory instead; see SECURITY.md for what counts as one.
+  - name: Questions and general discussion
+    url: https://github.com/ProgrammerMAX114514/awake-daemon/discussions
+    about: Ask a question, share a setup, or discuss an idea that is not yet a concrete issue.
