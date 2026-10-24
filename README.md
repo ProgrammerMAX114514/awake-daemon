@@ -22,7 +22,7 @@ Prebuilt packages are attached to the [latest release](https://github.com/Progra
 awake-daemon.win64.zip   awake.exe, awake.daemon.exe, LICENSE, NOTICE
 ```
 
-Every release tag is GPG-signed; the release notes list the highlights, the behaviour changes and the full command list. Extract the zip into any folder - both executables are statically linked and need no runtime or installer. Building from source is described below.
+Every release tag is GPG-signed; the release notes list the highlights, the behaviour changes and the full command list. The version history is summarized in [CHANGELOG.md](CHANGELOG.md). Extract the zip into any folder - both executables are statically linked and need no runtime or installer. Building from source is described below.
 
 ## Features
 
