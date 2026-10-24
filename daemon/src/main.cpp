@@ -39,6 +39,7 @@
 #include "console.h"
 #include "ipc.h"
 #include "logging.h"
+#include "privilege.h"
 #include "monitor.h"
 #include "power.h"
 #include "privilege.h"
@@ -72,6 +73,28 @@ int main(int argc, char** argv) {
                         version::kVersion);
         console::PrintLine(console::kColorReset, "Use 'awake daemon on' to start the daemon.");
         return 1;
+    }
+
+    // An elevated daemon is a footgun: its pipe carries a high integrity
+    // label that a non-elevated client cannot write to, which would leave
+    // the user with a daemon nobody can control (checklist item 2). All
+    // features work without admin rights, so refuse to run elevated (option
+    // A of the elevation matrix decision). Automation environments whose
+    // runners are always elevated (GitHub Actions) set
+    // AWAKE_ALLOW_ELEVATED=1 to opt out - with a loud warning.
+    char allowElevated[8] = { 0 };
+    const bool overrideActive =
+        GetEnvironmentVariableA("AWAKE_ALLOW_ELEVATED", allowElevated,
+                                 sizeof(allowElevated)) > 0 &&
+        allowElevated[0] != '\0';
+    if (privilege::IsProcessElevated()) {
+        if (!overrideActive) {
+            console::PrintErrLine(console::kColorRed,
+                                  "Error: the daemon must not run elevated; start it from a non-elevated shell.");
+            return 1;
+        }
+        console::PrintErrLine(console::kColorYellow,
+                              "Warning: running elevated by AWAKE_ALLOW_ELEVATED override; a non-elevated client cannot control this daemon.");
     }
 
     // Guarantee that only one daemon instance runs at a time.

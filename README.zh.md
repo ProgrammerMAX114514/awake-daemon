@@ -36,7 +36,7 @@ awake-daemon.win64.zip   awake.exe、awake.daemon.exe、LICENSE、NOTICE
 - **守护进程开机自启**（`awake daemon enable`）：可选地在用户登录时自动启动守护进程（写入当前用户注册表 Run 键，无需管理员权限）。
 - **脚本友好输出**（`awake list`、`--json`、`--no-color` / `NO_COLOR`）：面向脚本与 CI 的纯文本与 JSON 模式。
 - **状态详情**：`awake status` 同时显示系统电源计划超时值、屏幕保护程序设置以及守护进程当前持有的电源请求。
-- **守护进程日志**（`awake log`）：可选的滚动日志文件，位于 `%LOCALAPPDATA%\awake\logs\daemon`，级别与上限可配置，并支持一键导出 zip（`awake log export`）便于附在 Issue 中。
+- **守护进程日志**（`awake log`）：滚动日志文件（默认启用），位于 `%LOCALAPPDATA%\awake\logs\daemon`，级别与上限可配置，并支持一键导出 zip（`awake log export`）便于附在 Issue 中。
 - 基于 ANSI 转义序列的**彩色控制台输出**。
 - 需要时客户端会自动启动守护进程（`awake 0` / `awake 1`）。
 

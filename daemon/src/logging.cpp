@@ -190,7 +190,7 @@ void ReloadFromConfig() {
     // Settings with their defaults; values are validated with clamps so a
     // hand-edited awake.ini cannot produce absurd behavior.
     const std::string enabledValue = config::ToLowerAscii(
-        ReadStringSetting("log_enabled", "false"));
+        ReadStringSetting("log_enabled", "true")); // logging is on by default
     g_enabled = (enabledValue == "true" || enabledValue == "1" || enabledValue == "yes");
 
     const std::string level = config::ToLowerAscii(

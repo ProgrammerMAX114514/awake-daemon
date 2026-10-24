@@ -158,7 +158,7 @@ const CommandEntry kCommandEntries[] = {
     { "log level <level>", "Set the log level (info or debug).", true },
     { "log max-files <n>", "Set how many log files are kept (1-100).", true },
     { "log max-size <mb>", "Set the per-file size limit in MB (1-100).", true },
-    { "log export [path]", "Export the log files as a .zip for an issue.", true },
+    { "log export [path]", "Export the log files as a .zip (default: awake-logs.zip in the current directory).", true },
 };
 
 const size_t kCommandEntryCount = sizeof(kCommandEntries) / sizeof(kCommandEntries[0]);
@@ -809,15 +809,19 @@ int cli::CmdLog(int argc, char** argv) {
     // "awake log": show the current settings and the log directory.
     if (argc < 3) {
         console::Printf(console::kColorReset, "Logging:    %s\n",
-                        ReadLogSetting("log_enabled", "false").c_str());
+                        ReadLogSetting("log_enabled", "true").c_str());
         console::Printf(console::kColorReset, "Level:      %s\n",
                         ReadLogSetting("log_level", "info").c_str());
         console::Printf(console::kColorReset, "Max files:  %s\n",
                         ReadLogSetting("log_max_files", "10").c_str());
         console::Printf(console::kColorReset, "Max size:   %s MB\n",
                         ReadLogSetting("log_max_size_mb", "5").c_str());
+        char cwd[MAX_PATH] = { 0 };
+        GetCurrentDirectoryA(MAX_PATH, cwd);
         console::Printf(console::kColorReset, "Directory:  %s\n",
                         logexport::LogDirectory().c_str());
+        console::Printf(console::kColorReset, "Export to:  %s\n",
+                        (std::string(cwd) + "\\awake-logs.zip").c_str());
         console::PrintLine(console::kColorReset,
                            "Use 'awake log on' to enable logging or 'awake log export' to pack the files.");
         return 0;
@@ -883,19 +887,24 @@ int cli::CmdLog(int argc, char** argv) {
 
     if (sub == "export") {
         // Default target: awake-logs-<timestamp>.zip in the current directory.
-        std::string target = "awake-logs.zip";
+        std::string target;
         if (argc >= 4) {
             target = argv[3];
         } else {
+            // Default target: the current working directory (absolute path).
+            char cwd[MAX_PATH] = { 0 };
+            GetCurrentDirectoryA(MAX_PATH, cwd);
             const std::time_t now = std::time(NULL);
             std::tm local;
+            char name[64] = { 0 };
             if (localtime_s(&local, &now) == 0) {
-                char name[64] = { 0 };
                 std::snprintf(name, sizeof(name), "awake-logs-%04d%02d%02d-%02d%02d%02d.zip",
                               local.tm_year + 1900, local.tm_mon + 1, local.tm_mday,
                               local.tm_hour, local.tm_min, local.tm_sec);
-                target = name;
+            } else {
+                std::snprintf(name, sizeof(name), "awake-logs.zip");
             }
+            target = std::string(cwd) + "\\" + name;
         }
         int fileCount = 0;
         std::string error;

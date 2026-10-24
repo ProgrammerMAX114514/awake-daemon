@@ -217,7 +217,19 @@ static int RunCommand(int originalArgc, char** originalArgv) {
             return 1;
         }
         const std::string sub = argv[2];
-        if (sub == "on" || sub == "1" || sub == "start")  return cli::CmdDaemonOn();
+        if (sub == "on" || sub == "1" || sub == "start") {
+            char allowElevated[8] = { 0 };
+            const bool overrideActive =
+                GetEnvironmentVariableA("AWAKE_ALLOW_ELEVATED", allowElevated,
+                                         sizeof(allowElevated)) > 0 &&
+                allowElevated[0] != '\0';
+            if (privilege::IsProcessElevated() && !overrideActive) {
+                console::PrintErrLine(console::kColorRed,
+                                      "Error: the daemon cannot be started from an elevated shell (its pipe would be uncontrollable from a normal one). Start it from a non-elevated shell.");
+                return 1;
+            }
+            return cli::CmdDaemonOn();
+        }
         if (sub == "off" || sub == "0" || sub == "stop")  return cli::CmdDaemonOff();
         if (sub == "enable")  return cli::CmdDaemonEnable();
         if (sub == "disable") return cli::CmdDaemonDisable();

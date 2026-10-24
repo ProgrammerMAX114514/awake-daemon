@@ -36,7 +36,7 @@ Every release tag is GPG-signed; the release notes list the highlights, the beha
 - **Daemon autostart** (`awake daemon enable`): optionally starts the daemon automatically at logon (written to the per-user registry Run key, no admin rights needed).
 - **Script-friendly output** (`awake list`, `--json`, `--no-color` / `NO_COLOR`): plain text and JSON modes for scripts and CI.
 - **Status details**: `awake status` also shows the system power plan timeouts, the screensaver setting and which execution state requests the daemon holds.
-- **Daemon logging** (`awake log`): optional rolling log files in `%LOCALAPPDATA%\awake\logs\daemon` with configurable level and limits, and a one-command zip export (`awake log export`) for issue attachments.
+- **Daemon logging** (`awake log`): rolling log files (enabled by default) in `%LOCALAPPDATA%\awake\logs\daemon` with configurable level and limits, and a one-command zip export (`awake log export`) for issue attachments.
 - **Colored console output** via ANSI escape sequences.
 - The client starts the daemon automatically when needed (for `awake 0` / `awake 1`).
 

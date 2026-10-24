@@ -21,6 +21,11 @@ on:
 permissions:
   contents: read
 
+# The runner runs elevated; the daemon refuses elevated execution for good
+# reasons, so the automation opts out explicitly (F15 stays visible anyway).
+env:
+  AWAKE_ALLOW_ELEVATED: '1'
+
 jobs:
   build:
     name: Build and smoke test

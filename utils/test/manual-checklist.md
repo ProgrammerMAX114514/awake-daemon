@@ -19,14 +19,16 @@ Environment used for this pass:
       with the comment header; the first command shows the license prompt
       and `awake version` works before acceptance.
 
-## 2. Elevation matrix (a daemon and a client in every combination)
+## 2. Elevation rules (option A: the daemon refuses elevated execution)
 
-| Client \ Daemon | Non-elevated | Elevated |
-|---|---|---|
-| **Non-elevated** | [ ] works | [ ] client warns, cannot control daemon |
-| **Elevated** | [ ] works | [ ] works, status shows `(elevated)` |
-
-- [ ] `awake status` shows the `(elevated)` marker for an elevated daemon.
+- [ ] Elevated shell: `awake daemon on` fails with the clear error
+      "the daemon cannot be started from an elevated shell".
+- [ ] Elevated shell: `awake.daemon.exe` launched by hand (with the internal
+      token) refuses with "the daemon must not run elevated".
+- [ ] Non-elevated shell: `awake daemon on` works; all commands control it.
+- [ ] `AWAKE_ALLOW_ELEVATED=1` overrides the refusal for automation
+      environments; the daemon then prints a loud warning and `awake status`
+      shows the `(elevated)` marker.
 
 ## 3. Power behavior
 
