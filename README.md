@@ -108,6 +108,8 @@ ctest --test-dir build --output-on-failure     # or run build\...\awake_tests.ex
 
 `-DAWAKE_BUILD_TESTS=OFF` skips them when only the executables are wanted.
 
+**What the test suite does not cover**: very long unattended uptime. The automated pass tops out at a short soak window, and the 1.0.0 verification added a four-hour compressed run, so stability over multi-day continuous operation is not established by the test matrix. Treat a long-running deployment as something to monitor rather than something this project proves.
+
 ## Continuous integration
 
 Two GitHub Actions workflows live in `.github/workflows/`:

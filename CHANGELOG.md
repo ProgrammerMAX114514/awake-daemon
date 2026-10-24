@@ -23,7 +23,8 @@ commands, aliases, options and wire verbs keep their meaning, and an
 incompatible change requires a major version bump. New commands and status
 fields may still be added in minor releases.
 
-- Verified with the R16 acceptance orchestrator (auto and semi tiers), the manual review checklist, and a four-hour compressed soak run on a second machine with randomized concurrency bursts mixed in - no anomalies and no memory growth trend.
+- Verified with the R16 acceptance orchestrator (auto and semi tiers), the manual review checklist, and a four-hour compressed soak run on a second machine with randomized concurrency bursts mixed in; that run reported no anomalies and no memory growth trend.
+- **Scope limit on the evidence above**: the test conditions reach hours of continuous running at most, so stability over multi-day unattended uptime is not guaranteed.
 - Distribution stays .zip only. Installers and package-manager manifests
   are planned for a later release.
 

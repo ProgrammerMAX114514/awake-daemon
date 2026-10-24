@@ -108,6 +108,8 @@ ctest --test-dir build --output-on-failure     # 或直接运行 build\...\awake
 
 只想构建可执行文件时用 `-DAWAKE_BUILD_TESTS=OFF` 跳过。
 
+**测试不覆盖的部分**：超长时间无人值守的常驻运行。自动化轮的 soak 窗口本身很短，1.0.0 的验证额外补了一轮四小时压缩运行，因此**多天连续运行的稳定性并未由测试矩阵证明**。把长期常驻视为需要持续观察的部署，而不是本项目已经验证过的结论。
+
 ## 持续集成
 
 `.github/workflows/` 下有两个 GitHub Actions 工作流：
