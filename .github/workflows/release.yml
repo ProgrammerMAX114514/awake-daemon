@@ -123,7 +123,18 @@ jobs:
               }
             }
             if ($null -ne $packageLine) {
-              $updated = @($lines[0..$packageLine] + $changelog + $lines[($packageLine + 1)..($lines.Count - 1)])
+              # Surround the link with blank lines. Without them Markdown folds
+              # it into the "Package:" paragraph and GitHub renders both on a
+              # single line, which is not what the notes look like in the repo.
+              # The trailing blank line is only added when the line that follows
+              # is not already empty, so the notes do not end up with a double
+              # blank line.
+              $updated = @($lines[0..$packageLine] + "" + $changelog)
+              $nextIsBlank = (($packageLine + 1) -lt $lines.Count) -and ($lines[$packageLine + 1] -eq "")
+              if (-not $nextIsBlank) { $updated += "" }
+              if ($packageLine -lt ($lines.Count - 1)) {
+                $updated += @($lines[($packageLine + 1)..($lines.Count - 1)])
+              }
             } else {
               $updated = @($lines + "" + $changelog)
             }
