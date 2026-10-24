@@ -28,7 +28,7 @@
 # pipe IPC and process enumeration helpers.
 # =============================================================================
 cmake_minimum_required(VERSION 3.15)
-project(awake VERSION 0.8.0 LANGUAGES CXX)
+project(awake VERSION 1.0.0 LANGUAGES CXX)
 
 # The version number lives in exactly one place: the project() call above.
 # version.h is generated from common/include/version.h.in during configuration,
@@ -36,7 +36,7 @@ project(awake VERSION 0.8.0 LANGUAGES CXX)
 # version without anybody having to keep two files in sync.
 #   Stable release:  set AWAKE_VERSION_SUFFIX to ""
 #   Pre-release:     "-beta", "-rc1", ...
-set(AWAKE_VERSION_SUFFIX "-beta-pre1.0.0")
+set(AWAKE_VERSION_SUFFIX "")
 set(AWAKE_VERSION_FULL "${PROJECT_VERSION}${AWAKE_VERSION_SUFFIX}")
 
 # The commit hash is shown in the version banner (F20). Reconfiguring happens

@@ -18,11 +18,20 @@ Thank you for your interest in contributing! This project is AI-generated (see t
 - **Style**: match the style of the surrounding code (4-space indent, `namespace` modules, camelCase functions with a `module::` prefix).
 - **Version numbers**: the version is declared only in `CMakeLists.txt` (`project(awake VERSION ...)` plus `AWAKE_VERSION_SUFFIX`). `version.h` is generated from `common/include/version.h.in` during configuration - never edit a version anywhere else. The smoke test verifies that the client and both READMEs agree with `CMakeLists.txt`.
 
+## Compatibility promise (1.0 and later)
+
+Starting with 1.0.0 the public surface is stable:
+
+- **Command line**: existing commands, aliases, options and the keys they print keep their meaning. Adding a command, an alias or a status field is allowed in a minor release; removing or renaming one requires a major version bump.
+- **Wire protocol**: the verbs and the KEY=VALUE fields declared in `common/include/protocol.h` follow the same rule. Clients ignore unknown lines, so a newer daemon may add fields without breaking older clients.
+- **Configuration**: `awake.ini` stays backward compatible. New keys are optional and existing files keep working unchanged.
+- **Behaviour**: bug fixes may change behaviour that was clearly wrong. Any such change is documented in the CHANGELOG.
+
 ## Commit and pull request guidelines
 
 - Keep commits focused; one logical change per commit.
 - Use the conventional style already in the log: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `test:`.
-- Every pull request must pass the smoke test locally; include the test summary (e.g. "91 passed, 0 failed") in the description. Run `python utils	estcceptance.py --tier auto` for changes that touch the daemon core or the wire protocol.
+- Every pull request must pass the smoke test locally; include the test summary (e.g. "91 passed, 0 failed") in the description. Run `python utils\test\acceptance.py --tier auto` for changes that touch the daemon core or the wire protocol.
 - New behaviour in `common/` should come with a unit test in `tests/` (Catch2 is vendored there; run `ctest --test-dir build` or the `awake_tests.exe` binary). The smoke test covers the CLI end to end, the unit tests cover the parsing and helper logic.
 - CI (`.github/workflows/ci.yml`) builds the project and runs the same smoke test on every push and pull request; a red run blocks the merge. Releases are produced by `release.yml` from a version tag - see the README for the short version.
 - Changes to the wire protocol must be made in `common/include/protocol.h` (single source of truth) and keep older clients working where possible - `ParseStatusResponse` ignores unknown KEY=VALUE lines on purpose.

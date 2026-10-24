@@ -7,7 +7,7 @@
 > [!IMPORTANT]
 > 本项目由 AI 生成，未经充分审查，使用前请谨慎甄别代码内容。作者不对使用本软件产生的任何后果负责。
 
-当前版本：**0.8.0-beta-pre1.0.0**
+当前版本：**1.0.0**
 
 `awake` 是一个 Windows 命令行工具，用于让系统保持唤醒。它由两个可执行文件组成：
 
@@ -16,7 +16,7 @@
 
 ## 下载
 
-预编译包挂在[发布页](https://github.com/ProgrammerMAX114514/awake-daemon/releases)下（当前所有版本均为预发布，`releases/latest` 不会列出它们）：
+预编译包挂在[发布页](https://github.com/ProgrammerMAX114514/awake-daemon/releases)下，稳定版也可直接通过 [`releases/latest`](https://github.com/ProgrammerMAX114514/awake-daemon/releases/latest) 获取：
 
 ```
 awake-daemon.win64.zip   awake.exe、awake.daemon.exe、LICENSE、NOTICE、

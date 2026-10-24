@@ -2,17 +2,31 @@
 
 All notable changes of the awake project. Formats follow the conventions
 from [keepachangelog.com](https://keepachangelog.com/); versions are
-semantic (`MAJOR.MINOR.PATCH` + a beta suffix while pre-stable). The
+semantic (`MAJOR.MINOR.PATCH`). The
 detailed notes for every release live in
 [.github/release-notes/](.github/release-notes/) and on the
 [GitHub releases page](https://github.com/ProgrammerMAX114514/awake-daemon/releases).
 
 ## [Unreleased]
 
-- R16 full verification round: bounded CI round plus the 24-hour soak and
-  the signed-off manual checklist (release gate for 1.0.0).
-- Release engineering: `AWAKE_VERSION_SUFFIX=""`, CHANGELOG finalization,
-  README final polish.
+Nothing yet.
+
+## [1.0.0] - 2026-10-24
+
+First stable release. **No functional changes since 0.8.0-beta-pre1.0.0** -
+this release is the outcome of the stabilization round: the 0.8.0 feature
+set with the pre-release suffix removed.
+
+From 1.0.0 on, the command line interface and the daemon protocol are
+covered by the stability promise described in CONTRIBUTING.md: existing
+commands, aliases, options and wire verbs keep their meaning, and an
+incompatible change requires a major version bump. New commands and status
+fields may still be added in minor releases.
+
+- Verified with the R16 acceptance orchestrator (auto and semi tiers) and
+  the manual review checklist.
+- Distribution stays .zip only. Installers and package-manager manifests
+  are planned for a later release.
 
 ## [0.8.0-beta-pre1.0.0] - 2026-10-24
 

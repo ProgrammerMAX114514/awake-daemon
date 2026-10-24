@@ -2,12 +2,12 @@
 
 ## Supported versions
 
-Only the latest release line receives security fixes. This project is in beta; older beta tags are not supported.
+Only the latest release line receives security fixes. Every pre-1.0 release, including the beta and pre-release tags, is unsupported.
 
-| Version                | Supported |
-|------------------------|-----------|
-| 0.8.0-beta-pre1.0.0    | yes       |
-| < 0.8.0-beta-pre1.0.0  | no        |
+| Version    | Supported |
+|------------|-----------|
+| 1.0.0      | yes       |
+| < 1.0.0    | no        |
 
 ## Reporting a vulnerability
 
