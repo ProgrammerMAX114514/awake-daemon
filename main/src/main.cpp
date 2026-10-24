@@ -50,6 +50,7 @@
 #include <cstdio>
 #include <ctime>
 #include <string>
+#include <vector>
 
 #include "commands.h"
 #include "config.h"
@@ -133,8 +134,27 @@ static bool ParseExpiryArguments(int argc, char** argv, int index, unsigned int&
 
 // Runs one command and returns its exit code. Kept separate from main() so
 // that the AI notice can be printed exactly once, after any command output.
-static int RunCommand(int argc, char** argv) {
+static int RunCommand(int originalArgc, char** originalArgv) {
     console::EnableColors();
+
+    // F3: the global output options may appear anywhere on the command
+    // line; strip them from the argument list before dispatching.
+    std::vector<char*> filteredArgv;
+    filteredArgv.push_back(originalArgv[0]);
+    for (int i = 1; i < originalArgc; ++i) {
+        const std::string arg = originalArgv[i];
+        if (arg == "--no-color") {
+            console::SetColorsEnabled(false);
+            continue;
+        }
+        if (arg == "--json") {
+            cli::SetJsonOutput(true);
+            continue;
+        }
+        filteredArgv.push_back(originalArgv[i]);
+    }
+    char** argv = filteredArgv.data();
+    const int argc = static_cast<int>(filteredArgv.size());
 
     // Warn when the client itself runs with administrator rights. A daemon
     // started from such a console cannot be stopped or contacted from a
@@ -225,6 +245,12 @@ static int RunCommand(int argc, char** argv) {
     }
     if (command == "reset") {
         return cli::CmdReset();
+    }
+    if (command == "list" || command == "l") {
+        return cli::CmdList();
+    }
+    if (command == "log" || command == "logs") {
+        return cli::CmdLog(argc, argv);
     }
     if (command == "add" || command == "del") {
         if (argc < 3) {

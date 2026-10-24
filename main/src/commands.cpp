@@ -34,12 +34,46 @@
 
 #include "autostart.h"
 #include "config.h"
+#include "logexport.h"
 #include "console.h"
 #include "ipc.h"
 #include "license.h"
 #include "protocol.h"
 #include "timeparse.h"
 #include "version.h"
+
+// -----------------------------------------------------------------------------
+// Machine-readable output (F3)
+// -----------------------------------------------------------------------------
+
+namespace {
+
+// Set by the global --json option; "list" and "status" emit JSON when set.
+bool g_jsonOutput = false;
+
+// Escapes a string for a JSON string literal (names are validated ASCII,
+// but be defensive anyway).
+std::string JsonEscape(const std::string& text) {
+    std::string escaped;
+    for (size_t i = 0; i < text.size(); ++i) {
+        const char c = text[i];
+        if (c == '"' || c == '\\') {
+            escaped.push_back('\\');
+        }
+        escaped.push_back(c);
+    }
+    return escaped;
+}
+
+} // namespace
+
+void cli::SetJsonOutput(bool enabled) {
+    g_jsonOutput = enabled;
+}
+
+bool cli::JsonOutput() {
+    return g_jsonOutput;
+}
 
 // -----------------------------------------------------------------------------
 // Help text
@@ -79,6 +113,8 @@ const AliasRow kAliasRows[] = {
     { "awake daemon",      "d" },
     { "awake daemon on",   "daemon 1, daemon start" },
     { "awake daemon off",  "daemon 0, daemon stop" },
+    { "awake list",        "l" },
+    { "awake log",         "logs" },
 };
 
 const size_t kAliasRowCount = sizeof(kAliasRows) / sizeof(kAliasRows[0]);
@@ -115,6 +151,14 @@ const CommandEntry kCommandEntries[] = {
     { "reset",           "Reset the configuration file (asks for confirmation).", true },
     { "add <imagename>", "Add an image name to the watch list.", true },
     { "del <imagename>", "Remove an image name from the watch list.", true },
+    { "list",            "List the watched applications (use --json for JSON).", true },
+    { "log",             "Show or change daemon logging (on / off / level / max-files / max-size / export).", false },
+    { "log on",          "Turn daemon logging on.", true },
+    { "log off",         "Turn daemon logging off.", true },
+    { "log level <level>", "Set the log level (info or debug).", true },
+    { "log max-files <n>", "Set how many log files are kept (1-100).", true },
+    { "log max-size <mb>", "Set the per-file size limit in MB (1-100).", true },
+    { "log export [path]", "Export the log files as a .zip for an issue.", true },
 };
 
 const size_t kCommandEntryCount = sizeof(kCommandEntries) / sizeof(kCommandEntries[0]);
@@ -700,4 +744,170 @@ int cli::CmdEditWatchList(const char* command, const char* imageName) {
     }
     console::Printf(console::kColorYellow, "'%s' was not found in the watch list.\n", imageName);
     return 0;
+}
+
+// -----------------------------------------------------------------------------
+// "awake list" (F3)
+// -----------------------------------------------------------------------------
+
+// Prints the watch list, one image name per line, or a JSON array with
+// --json. Deliberately plain: this is the script-facing command.
+int cli::CmdList() {
+    const std::vector<std::string> watchList = config::ReadWatchList();
+    if (JsonOutput()) {
+        std::printf("[\n");
+        for (size_t i = 0; i < watchList.size(); ++i) {
+            std::printf("  \"%s\"%s\n", JsonEscape(watchList[i]).c_str(),
+                        (i + 1 < watchList.size()) ? "," : "");
+        }
+        std::printf("]\n");
+        return 0;
+    }
+    if (watchList.empty()) {
+        console::PrintLine(console::kColorYellow, "(the watch list is empty)");
+        return 0;
+    }
+    for (size_t i = 0; i < watchList.size(); ++i) {
+        console::Printf(console::kColorReset, "%s\n", watchList[i].c_str());
+    }
+    return 0;
+}
+
+// -----------------------------------------------------------------------------
+// "awake log" (F7)
+// -----------------------------------------------------------------------------
+
+namespace {
+
+// Tells a running daemon to re-read its settings (the log commands write
+// them into awake.ini first). Silent when the daemon is not running: the
+// settings then apply at the next daemon start.
+void NotifyDaemonReload() {
+    if (!ipc::IsDaemonRunning()) {
+        return;
+    }
+    std::string response;
+    if (ipc::SendRequest(protocol::kReqReload, response) &&
+        response.compare(0, 2, "OK") == 0) {
+        console::PrintLine(console::kColorReset,
+                           "The running daemon has reloaded its settings.");
+    }
+}
+
+// Reads a log setting with a fallback for the display command.
+std::string ReadLogSetting(const char* key, const char* fallback) {
+    std::string value;
+    if (!config::ReadSetting("settings", key, value) || value.empty()) {
+        return fallback;
+    }
+    return value;
+}
+
+} // namespace
+
+int cli::CmdLog(int argc, char** argv) {
+    // "awake log": show the current settings and the log directory.
+    if (argc < 3) {
+        console::Printf(console::kColorReset, "Logging:    %s\n",
+                        ReadLogSetting("log_enabled", "false").c_str());
+        console::Printf(console::kColorReset, "Level:      %s\n",
+                        ReadLogSetting("log_level", "info").c_str());
+        console::Printf(console::kColorReset, "Max files:  %s\n",
+                        ReadLogSetting("log_max_files", "10").c_str());
+        console::Printf(console::kColorReset, "Max size:   %s MB\n",
+                        ReadLogSetting("log_max_size_mb", "5").c_str());
+        console::Printf(console::kColorReset, "Directory:  %s\n",
+                        logexport::LogDirectory().c_str());
+        console::PrintLine(console::kColorReset,
+                           "Use 'awake log on' to enable logging or 'awake log export' to pack the files.");
+        return 0;
+    }
+
+    const std::string sub = config::ToLowerAscii(argv[2]);
+
+    if (sub == "on" || sub == "off") {
+        const std::string value = (sub == "on") ? "true" : "false";
+        if (!config::WriteSetting("settings", "log_enabled", value)) {
+            console::PrintLine(console::kColorRed, "Error: cannot write the log settings.");
+            return 1;
+        }
+        NotifyDaemonReload();
+        if (sub == "on") {
+            console::Printf(console::kColorGreen, "Daemon logging ENABLED. Files are written to %s\n",
+                            logexport::LogDirectory().c_str());
+        } else {
+            console::PrintLine(console::kColorGreen, "Daemon logging DISABLED.");
+        }
+        return 0;
+    }
+
+    if (sub == "level") {
+        if (argc < 4) {
+            console::PrintLine(console::kColorRed, "Error: 'log level' needs a level (info or debug).");
+            return 1;
+        }
+        const std::string level = config::ToLowerAscii(argv[3]);
+        if (level != "info" && level != "debug") {
+            console::Printf(console::kColorRed, "Error: unknown log level '%s' (expected info or debug).\n", argv[3]);
+            return 1;
+        }
+        if (!config::WriteSetting("settings", "log_level", level)) {
+            console::PrintLine(console::kColorRed, "Error: cannot write the log settings.");
+            return 1;
+        }
+        NotifyDaemonReload();
+        console::Printf(console::kColorGreen, "Log level set to %s.\n", level.c_str());
+        return 0;
+    }
+
+    if (sub == "max-files" || sub == "max-size") {
+        if (argc < 4) {
+            console::Printf(console::kColorRed, "Error: 'log %s' needs a number (1-100).\n", sub.c_str());
+            return 1;
+        }
+        const int value = std::atoi(argv[3]);
+        if (value < 1 || value > 100) {
+            console::Printf(console::kColorRed, "Error: '%s' is out of range (1-100).\n", argv[3]);
+            return 1;
+        }
+        const std::string key = (sub == "max-files") ? "log_max_files" : "log_max_size_mb";
+        if (!config::WriteSetting("settings", key, std::to_string(value))) {
+            console::PrintLine(console::kColorRed, "Error: cannot write the log settings.");
+            return 1;
+        }
+        NotifyDaemonReload();
+        console::Printf(console::kColorGreen, "Log %s set to %d.\n",
+                        (sub == "max-files") ? "file limit" : "size limit (MB)", value);
+        return 0;
+    }
+
+    if (sub == "export") {
+        // Default target: awake-logs-<timestamp>.zip in the current directory.
+        std::string target = "awake-logs.zip";
+        if (argc >= 4) {
+            target = argv[3];
+        } else {
+            const std::time_t now = std::time(NULL);
+            std::tm local;
+            if (localtime_s(&local, &now) == 0) {
+                char name[64] = { 0 };
+                std::snprintf(name, sizeof(name), "awake-logs-%04d%02d%02d-%02d%02d%02d.zip",
+                              local.tm_year + 1900, local.tm_mon + 1, local.tm_mday,
+                              local.tm_hour, local.tm_min, local.tm_sec);
+                target = name;
+            }
+        }
+        int fileCount = 0;
+        std::string error;
+        if (!logexport::ZipLogDirectory(target, fileCount, error)) {
+            console::Printf(console::kColorRed, "Error: %s.\n", error.c_str());
+            return 1;
+        }
+        console::Printf(console::kColorGreen, "Exported %d log file(s) to %s\n",
+                        fileCount, target.c_str());
+        return 0;
+    }
+
+    cli::PrintCommandSuggestions("log " + sub, "log");
+    return 1;
 }

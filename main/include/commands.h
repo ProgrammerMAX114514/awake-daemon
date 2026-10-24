@@ -92,6 +92,19 @@ int CmdReset();
 // command is "add" or "del" (used for the output messages).
 int CmdEditWatchList(const char* command, const char* imageName);
 
+// F3: machine-readable output mode (--json) for "list" and "status".
+void SetJsonOutput(bool enabled);
+bool JsonOutput();
+
+// "awake list": the watch list, one image name per line (or a JSON array
+// with --json). Plain text on purpose - meant for scripts.
+int CmdList();
+
+// "awake log": show or change the daemon log settings (no argument shows
+// them; on, off, level, max-files, max-size modify them; export packs the
+// log files into a .zip for an issue attachment).
+int CmdLog(int argc, char** argv);
+
 } // namespace cli
 
 #endif // AWAKE_COMMANDS_H
