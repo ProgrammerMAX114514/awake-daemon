@@ -38,6 +38,7 @@
 #include "config.h"
 #include "console.h"
 #include "ipc.h"
+#include "logging.h"
 #include "monitor.h"
 #include "power.h"
 #include "privilege.h"
@@ -85,8 +86,10 @@ int main(int argc, char** argv) {
     // Make sure a configuration file exists before anything reads it.
     config::EnsureConfigExists();
 
-    // Initialize the shared state and start the power thread.
+    // Initialize the shared state, prepare logging and start the power thread.
     daemonstate::Init();
+    daemonlog::ReloadFromConfig();
+    daemonlog::Info(std::string("daemon started (") + version::kVersion + ")");
     HANDLE powerThread = power::StartPowerThread();
     if (powerThread == NULL) {
         console::PrintLine(console::kColorRed, "Error: failed to create the power thread.");
@@ -104,6 +107,7 @@ int main(int argc, char** argv) {
     // Stop the power monitor first so no resume event lands during teardown,
     // then stop the power thread (it resets the execution state on its way
     // out) and tear everything down.
+    daemonlog::Info("daemon stopping");
     monitor::StopPowerMonitor();
     power::StopPowerThread(powerThread);
     daemonstate::Shutdown();

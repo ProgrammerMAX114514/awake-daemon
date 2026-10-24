@@ -29,6 +29,7 @@
 #include <vector>
 
 #include "config.h"
+#include "logging.h"
 #include "process.h"
 #include "state.h"
 
@@ -51,6 +52,7 @@ void ApplyDesiredState() {
     // call then sees the fresh file.
     if (GetFileAttributesA(config::GetConfigPath().c_str()) == INVALID_FILE_ATTRIBUTES) {
         config::EnsureConfigExists();
+        daemonlog::Info("configuration file was missing; recreated the template");
     }
 
     // Reload the configuration on every pass so that "awake add"/"awake del"
@@ -83,8 +85,19 @@ void ApplyDesiredState() {
         SetThreadExecutionState(ES_CONTINUOUS);
     }
 
-    // Cache the result for GET_STATUS / GET_APPS answers.
+    // Cache the result for GET_STATUS / GET_APPS answers and log transitions.
+    const bool appActiveBefore = daemonstate::GetAppActive();
+    if (appActiveBefore != appActive) {
+        // An app-level transition is worth an info line; the routine per-pass
+        // summary goes to debug.
+        daemonlog::Info(appActive
+                            ? "a watched application started running; keep-awake applied"
+                            : "no watched application is running anymore");
+    }
     daemonstate::SetAppActive(appActive);
+    daemonlog::Debug("state applied: manual=" + std::string(manual ? "1" : "0") +
+                     " app=" + std::string(appActive ? "1" : "0") +
+                     " screen=" + std::string(screen ? "1" : "0"));
 }
 
 // Power thread: applies the desired state, then sleeps until either the

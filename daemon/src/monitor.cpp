@@ -30,6 +30,7 @@
 
 #include <windows.h>
 
+#include "logging.h"
 #include "state.h"
 
 namespace monitor {
@@ -54,6 +55,7 @@ LRESULT CALLBACK PowerMonitorWndProc(HWND window, UINT message,
         // resume and wake the power thread. PBT_APMSUSPEND (going to sleep)
         // needs no action.
         if (wParam == PBT_APMRESUMEAUTOMATIC || wParam == PBT_APMRESUMESUSPEND) {
+            daemonlog::Info("system resumed from sleep; re-applying the state");
             daemonstate::RecordResume(); // also wakes the power thread
         }
         return TRUE; // handled

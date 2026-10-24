@@ -30,6 +30,7 @@
 
 #include "config.h"
 #include "ipc.h"
+#include "logging.h"
 #include "privilege.h"
 #include "process.h"
 #include "protocol.h"
@@ -118,6 +119,8 @@ std::string HandleRequest(const std::string& request) {
     const size_t firstSpace = line.find(' ');
     const std::string verb = line.substr(0, firstSpace == std::string::npos ? line.size() : firstSpace);
 
+    daemonlog::Info("request: " + line);
+
     if (verb == "PING") {
         // Echo the daemon version back so the client can warn about
         // client/daemon version mismatches.
@@ -177,7 +180,11 @@ std::string HandleRequest(const std::string& request) {
     if (verb == "RELOAD") {
         // Wake the power thread: its next pass re-reads the configuration
         // file and re-applies the desired state immediately, instead of
-        // waiting up to 30 seconds for the regular poll.
+        // waiting up to 30 seconds for the regular poll. The reload also
+        // covers the log settings: "awake log ..." writes them into
+        // awake.ini and then sends RELOAD.
+        daemonlog::ReloadFromConfig();
+        daemonlog::Info("configuration reloaded on request");
         daemonstate::WakePowerThread();
         return "OK configuration reload requested\n";
     }
