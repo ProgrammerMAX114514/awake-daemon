@@ -45,6 +45,14 @@ const unsigned int kPollIntervalMs = 30 * 1000; // watch list poll interval: 30 
 // Manual sleep (power button, Start menu, other applications) is never
 // blocked - that behavior is exactly what the tool promises.
 void ApplyDesiredState() {
+    // Self-heal (R6): when the configuration file has vanished (manual
+    // deletion, disk cleanup), recreate the template right away instead of
+    // running with a permanently empty watch list. The next ReadWatchList
+    // call then sees the fresh file.
+    if (GetFileAttributesA(config::GetConfigPath().c_str()) == INVALID_FILE_ATTRIBUTES) {
+        config::EnsureConfigExists();
+    }
+
     // Reload the configuration on every pass so that "awake add"/"awake del"
     // changes take effect without a daemon restart (hot reload).
     const std::vector<std::string> watchList = config::ReadWatchList();
