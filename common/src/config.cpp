@@ -26,6 +26,7 @@
 #include <cctype>
 #include <cstddef>
 #include <fstream>
+#include <mutex>
 #include <set>
 
 namespace config {
@@ -199,6 +200,43 @@ bool ReadAllLines(const std::string& path, std::vector<std::string>& lines) {
     return true;
 }
 
+// -----------------------------------------------------------------------------
+// Watch list cache (P4). Reading awake.ini on every poll is cheap, but the
+// daemon reads it from two threads and the file only changes when someone
+// writes it, so the parsed result is reused while (last write time, size)
+// stay the same. Every write in this module goes through WriteFileAtomic,
+// which drops the cache entry - the atomic swap can keep the original file's
+// timestamps, so the stat check alone would not be enough.
+// -----------------------------------------------------------------------------
+
+std::mutex g_watchCacheMutex;
+bool g_watchCacheValid = false;         // false = no cached entry at all
+bool g_watchCacheMissing = false;       // true = cached "file does not exist"
+std::string g_watchCachePath;
+FILETIME g_watchCacheWriteTime = {};
+ULONGLONG g_watchCacheSize = 0; // file size in bytes
+std::vector<std::string> g_watchCacheEntries;
+
+// Drops the cached watch list for the given path (called after every write).
+void InvalidateWatchCache(const std::string& path) {
+    std::lock_guard<std::mutex> lock(g_watchCacheMutex);
+    if (g_watchCacheValid && g_watchCachePath == path) {
+        g_watchCacheValid = false;
+    }
+}
+
+// True when the cached entries still match the file's current stat data.
+bool WatchCacheMatches(const WIN32_FILE_ATTRIBUTE_DATA& attributes) {
+    if (!g_watchCacheValid || g_watchCacheMissing) {
+        return false;
+    }
+    const ULONGLONG size = (static_cast<ULONGLONG>(attributes.nFileSizeHigh) << 32) |
+                           attributes.nFileSizeLow;
+    return g_watchCacheWriteTime.dwLowDateTime == attributes.ftLastWriteTime.dwLowDateTime &&
+           g_watchCacheWriteTime.dwHighDateTime == attributes.ftLastWriteTime.dwHighDateTime &&
+           g_watchCacheSize == size;
+}
+
 // Writes content to the given path atomically: the text goes into a
 // temporary file next to the target, which is then swapped in. A daemon that
 // reads the file at the same time therefore sees either the old or the new
@@ -222,11 +260,13 @@ bool WriteFileAtomic(const std::string& path, const std::string& content) {
     if (ReplaceFileA(path.c_str(), tempPath.c_str(), NULL,
                      REPLACEFILE_IGNORE_MERGE_ERRORS | REPLACEFILE_WRITE_THROUGH,
                      NULL, NULL)) {
+        InvalidateWatchCache(path);
         return true;
     }
     // ReplaceFile fails when the target does not exist yet (first write).
     if (MoveFileExA(tempPath.c_str(), path.c_str(),
                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        InvalidateWatchCache(path);
         return true;
     }
     DeleteFileA(tempPath.c_str());
@@ -299,25 +339,60 @@ std::vector<std::string> ReadWatchList() {
 
 std::vector<std::string> ReadWatchList(const std::string& path) {
     std::vector<std::string> entries;
-    std::ifstream file(path.c_str(), std::ios::binary);
-    if (!file.is_open()) {
-        return entries; // no file, no entries
+
+    // P4: reuse the parsed list while the file's (last write time, size) do
+    // not change. The stat is done on every call; only the file read and the
+    // parse are cached.
+    WIN32_FILE_ATTRIBUTE_DATA attributes;
+    const bool fileExists = GetFileAttributesExA(path.c_str(), GetFileExInfoStandard,
+                                                &attributes) != 0;
+    {
+        std::lock_guard<std::mutex> lock(g_watchCacheMutex);
+        if (g_watchCacheValid && g_watchCachePath == path) {
+            if (g_watchCacheMissing && !fileExists) {
+                return g_watchCacheEntries; // still missing
+            }
+            if (!g_watchCacheMissing && fileExists && WatchCacheMatches(attributes)) {
+                return g_watchCacheEntries; // unchanged since the last read
+            }
+        }
     }
-    std::string section;
-    std::string line;
-    while (std::getline(file, line)) {
-        const std::string trimmed = Trim(line);
-        if (IsCommentOrBlank(trimmed)) {
-            continue;
+
+    if (fileExists) {
+        std::ifstream file(path.c_str(), std::ios::binary);
+        if (file.is_open()) {
+            std::string section;
+            std::string line;
+            while (std::getline(file, line)) {
+                const std::string trimmed = Trim(line);
+                if (IsCommentOrBlank(trimmed)) {
+                    continue;
+                }
+                if (IsSectionHeader(trimmed)) {
+                    section = SectionName(trimmed);
+                    continue;
+                }
+                if (!IsWatchSection(section)) {
+                    continue; // settings of another section (e.g. [license])
+                }
+                entries.push_back(trimmed);
+            }
         }
-        if (IsSectionHeader(trimmed)) {
-            section = SectionName(trimmed);
-            continue;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_watchCacheMutex);
+        g_watchCacheValid = true;
+        g_watchCachePath = path;
+        g_watchCacheEntries = entries;
+        if (fileExists) {
+            g_watchCacheMissing = false;
+            g_watchCacheWriteTime = attributes.ftLastWriteTime;
+            g_watchCacheSize = (static_cast<ULONGLONG>(attributes.nFileSizeHigh) << 32) |
+                               attributes.nFileSizeLow;
+        } else {
+            g_watchCacheMissing = true;
         }
-        if (!IsWatchSection(section)) {
-            continue; // settings of another section (e.g. [license])
-        }
-        entries.push_back(trimmed);
     }
     return entries;
 }
@@ -377,6 +452,148 @@ bool AddWatchEntry(const std::string& path, const std::string& imageName) {
 
 bool RemoveWatchEntry(const std::string& imageName) {
     return RemoveWatchEntry(GetConfigPath(), imageName);
+}
+
+// -----------------------------------------------------------------------------
+// Generic settings (key = value lines inside a named section)
+// -----------------------------------------------------------------------------
+
+namespace {
+
+// Validates a section or key name for WriteSetting: plain lowercase
+// identifiers only, so a malformed call cannot corrupt the file structure.
+bool IsValidSettingName(const std::string& text) {
+    if (text.empty() || text.size() > 64) {
+        return false;
+    }
+    for (size_t i = 0; i < text.size(); ++i) {
+        const char c = text[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_')) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Validates a setting value: printable ASCII without line breaks or brackets.
+bool IsValidSettingValue(const std::string& text) {
+    if (text.size() > 256) {
+        return false;
+    }
+    for (size_t i = 0; i < text.size(); ++i) {
+        const char c = text[i];
+        if (static_cast<unsigned char>(c) < 0x20 || static_cast<unsigned char>(c) > 0x7E) {
+            return false;
+        }
+    }
+    return true;
+}
+
+} // namespace
+
+bool ReadSetting(const std::string& section, const std::string& key,
+                 std::string& value) {
+    return ReadSetting(GetConfigPath(), section, key, value);
+}
+
+bool ReadSetting(const std::string& path, const std::string& section,
+                 const std::string& key, std::string& value) {
+    value.clear();
+
+    std::vector<std::string> lines;
+    if (!ReadAllLines(path, lines)) {
+        return false;
+    }
+    const std::string wantedSection = ToLowerAscii(section);
+    const std::string wantedKey = ToLowerAscii(key);
+
+    std::string current;
+    for (size_t i = 0; i < lines.size(); ++i) {
+        const std::string trimmed = Trim(lines[i]);
+        if (IsSectionHeader(trimmed)) {
+            current = SectionName(trimmed);
+            continue;
+        }
+        if (IsCommentOrBlank(trimmed) || current != wantedSection) {
+            continue;
+        }
+        const std::string lineKey = KeyOf(trimmed);
+        if (lineKey == wantedKey) {
+            // Keep the original case of the value (unlike ValueOf, which
+            // lower-cases - good for keywords, wrong for free-form values).
+            const size_t equals = trimmed.find('=');
+            if (equals != std::string::npos) {
+                value = Trim(trimmed.substr(equals + 1));
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool WriteSetting(const std::string& section, const std::string& key,
+                  const std::string& value) {
+    return WriteSetting(GetConfigPath(), section, key, value);
+}
+
+bool WriteSetting(const std::string& path, const std::string& section,
+                  const std::string& key, const std::string& value) {
+    if (!IsValidSettingName(section) || !IsValidSettingName(key) ||
+        !IsValidSettingValue(value)) {
+        return false;
+    }
+    if (!EnsureConfigExists(path)) {
+        return false;
+    }
+
+    std::vector<std::string> lines;
+    if (!ReadAllLines(path, lines)) {
+        return false;
+    }
+    const std::string wantedSection = ToLowerAscii(section);
+    const std::string valueLine = key + " = " + value;
+
+    std::string current;
+    size_t headerIndex = std::string::npos; // line of the section header
+    size_t valueIndex = std::string::npos;  // line of the key inside it
+    size_t sectionEnd = std::string::npos;  // first line after the section
+    for (size_t i = 0; i < lines.size(); ++i) {
+        const std::string trimmed = Trim(lines[i]);
+        if (IsSectionHeader(trimmed)) {
+            if (current == wantedSection && sectionEnd == std::string::npos) {
+                sectionEnd = i;
+            }
+            current = SectionName(trimmed);
+            if (current == wantedSection && headerIndex == std::string::npos) {
+                headerIndex = i;
+            }
+            continue;
+        }
+        if (IsCommentOrBlank(trimmed) || current != wantedSection) {
+            continue;
+        }
+        if (KeyOf(trimmed) == ToLowerAscii(key) && valueIndex == std::string::npos) {
+            valueIndex = i;
+        }
+    }
+
+    if (valueIndex != std::string::npos) {
+        lines[valueIndex] = valueLine; // update in place, keep the comments
+    } else if (headerIndex != std::string::npos) {
+        const size_t insertAt = (sectionEnd != std::string::npos)
+                                    ? sectionEnd
+                                    : lines.size();
+        lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(insertAt),
+                     valueLine);
+    } else {
+        // No such section yet: append a new block at the end of the file.
+        // Safe for the watch list: entries after a section header are no
+        // longer read as watch entries anyway.
+        lines.push_back("[" + section + "]");
+        lines.push_back(valueLine);
+        lines.push_back("");
+    }
+    return WriteAllLines(path, lines);
 }
 
 bool RemoveWatchEntry(const std::string& path, const std::string& imageName) {

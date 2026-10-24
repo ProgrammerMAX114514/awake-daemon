@@ -88,6 +88,30 @@ bool RemoveWatchEntry(const std::string& imageName);
 // Same as above, but for an explicit file path.
 bool RemoveWatchEntry(const std::string& path, const std::string& imageName);
 
+// -----------------------------------------------------------------------------
+// Generic settings (key = value lines inside a named section)
+// -----------------------------------------------------------------------------
+
+// Reads one "key = value" setting from the given section (for example
+// section "settings", key "log_enabled"). Returns true and fills value
+// (original case, trimmed) when the key exists; the comparisons are
+// case-insensitive.
+bool ReadSetting(const std::string& section, const std::string& key,
+                 std::string& value);
+// Same as above, but for an explicit file path.
+bool ReadSetting(const std::string& path, const std::string& section,
+                 const std::string& key, std::string& value);
+
+// Writes one "key = value" into the given section: an existing key is
+// updated in place, a missing key is inserted at the end of the section and
+// a missing section is appended to the end of the file. Everything else
+// (comments, the watch list) is preserved.
+bool WriteSetting(const std::string& section, const std::string& key,
+                  const std::string& value);
+// Same as above, but for an explicit file path.
+bool WriteSetting(const std::string& path, const std::string& section,
+                  const std::string& key, const std::string& value);
+
 // Validates a user supplied image name: it must be a plain file name
 // (no path separators, no wildcards, printable ASCII, reasonable length).
 bool IsValidImageName(const std::string& imageName);
