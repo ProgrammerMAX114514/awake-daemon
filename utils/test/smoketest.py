@@ -104,14 +104,17 @@ def run_client(cfg, args, stdin_text=None, timeout_s=None):
     try:
         result = subprocess.run(
             [cfg["client_path"]] + args,
-            input=stdin_text,
+            # Always pipe stdin (empty unless the test feeds text): a child
+            # that inherits the interactive console would block forever at
+            # prompts such as the license gate (F16) or "awake reset".
+            input=stdin_text or "",
             capture_output=True,
             text=True,
             timeout=effectiveTimeout,
         )
     except subprocess.TimeoutExpired:
-        # A wedged daemon or an unanswered antivirus prompt makes the client
-        # block; report it instead of crashing the whole test run.
+        # A wedged daemon or an unanswered interactive prompt makes the
+        # client block; report it instead of crashing the whole test run.
         return 1, "TIMEOUT after %ds: awake %s" % (effectiveTimeout, " ".join(args))
     return result.returncode, (result.stdout or "") + (result.stderr or "")
 
@@ -124,7 +127,7 @@ def run_client_stdout(cfg, args, stdin_text=None, timeout_s=None):
     try:
         result = subprocess.run(
             [cfg["client_path"]] + args,
-            input=stdin_text,
+            input=stdin_text or "",
             capture_output=True,
             text=True,
             timeout=effectiveTimeout,
