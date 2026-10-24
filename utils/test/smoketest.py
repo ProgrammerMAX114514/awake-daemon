@@ -59,6 +59,11 @@ import winreg
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 
+# The client banner reads "awake <major>.<minor>.<patch>" plus an optional
+# git hash, e.g. "awake 1.0.0 (git cbf34c1)". Matching the shape instead of a
+# fixed prefix keeps the test valid across major versions.
+VERSION_BANNER = re.compile(r"awake \d+\.\d+\.\d+")
+
 
 def load_config(path):
     """Loads the INI configuration and returns a dict of flattened options."""
@@ -298,7 +303,7 @@ def test_license_gate(cfg):
 
     code, out = run_client(cfg, ["version"])
     check("version is exempt from the license gate",
-          code == 0 and "awake 0." in out, out.strip())
+          code == 0 and VERSION_BANNER.search(out) is not None, out.strip())
     code, out = run_client(cfg, ["help"])
     check("help is exempt from the license gate",
           code == 0 and "Usage:" in out, out.strip())
@@ -314,7 +319,8 @@ def test_license_gate(cfg):
 
 def test_version_and_help(cfg):
     code, out = run_client(cfg, ["version"])
-    check("awake version prints the version", code == 0 and "awake 0." in out, out.strip())
+    check("awake version prints the version",
+          code == 0 and VERSION_BANNER.search(out) is not None, out.strip())
 
     code, out = run_client(cfg, ["help"])
     check("awake help shows the version and usage",
