@@ -22,7 +22,7 @@
 awake-daemon.win64.zip   awake.exe、awake.daemon.exe、LICENSE、NOTICE
 ```
 
-每个发布 tag 都有 GPG 签名；Release 说明里列出了亮点、行为变更与完整命令表。解压到任意目录即可使用——两个可执行文件均静态链接，无需运行时或安装器。从源码构建见下文。
+每个发布 tag 都有 GPG 签名；Release 说明里列出了亮点、行为变更与完整命令表。版本历史汇总见 [CHANGELOG.md](CHANGELOG.md)。解压到任意目录即可使用——两个可执行文件均静态链接，无需运行时或安装器。从源码构建见下文。
 
 ## 功能特性
 
