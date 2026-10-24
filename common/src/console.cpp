@@ -34,44 +34,22 @@ namespace console {
 // Set once the reminder has been shown (or is not wanted any more).
 static bool g_aiNoticeSuppressed = false;
 
+// Runtime switch for colored output (--no-color / NO_COLOR, F3): when false
+// the color codes are not emitted at all.
+static bool g_colorsEnabled = true;
+
 const char* const kColorReset = "\x1b[0m";
 const char* const kColorRed   = "\x1b[31m";
 const char* const kColorGreen = "\x1b[32m";
 const char* const kColorYellow= "\x1b[33m";
 const char* const kColorCyan  = "\x1b[36m";
 
-void EnableColors() {
-    // Only the standard output handle needs the virtual terminal flag;
-    // every colored write in this tool goes through stdout.
-    HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (handle == INVALID_HANDLE_VALUE || handle == NULL) {
-        return; // not attached to a console, nothing to enable
-    }
-    DWORD mode = 0;
-    if (!GetConsoleMode(handle, &mode)) {
-        return; // output is redirected to a file/pipe, keep raw escape codes off the console path
-    }
-    // Enable ANSI escape sequence interpretation. If the flag is already
-    // set, or the flag is not supported, the call simply has no effect.
-    mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-    SetConsoleMode(handle, mode);
+void SetColorsEnabled(bool enabled) {
+    g_colorsEnabled = enabled;
 }
 
-void PrintLine(const char* color, const char* text) {
-    Printf(color, "%s\n", text);
-}
-
-void Printf(const char* color, const char* fmt, ...) {
-    std::va_list args;
-    va_start(args, fmt);
-    std::printf("%s", color);
-    std::vprintf(fmt, args);
-    std::printf("%s", kColorReset);
-    va_end(args);
-}
-
-void SuppressAiNotice() {
-    g_aiNoticeSuppressed = true;
+bool ColorsEnabled() {
+    return g_colorsEnabled;
 }
 
 namespace {
@@ -116,6 +94,52 @@ bool EqualsIgnoreCase(const std::string& value, const char* expected) {
 }
 
 } // namespace
+
+void EnableColors() {
+    // NO_COLOR (https://no-color.org): any non-empty value disables colors.
+    std::string noColor;
+    if (ReadEnv("NO_COLOR", noColor) && !noColor.empty()) {
+        g_colorsEnabled = false;
+    }
+    if (!g_colorsEnabled) {
+        return; // plain output: do not even switch the console into VT mode
+    }
+    // Only the standard output handle needs the virtual terminal flag;
+    // every colored write in this tool goes through stdout.
+    HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (handle == INVALID_HANDLE_VALUE || handle == NULL) {
+        return; // not attached to a console, nothing to enable
+    }
+    DWORD mode = 0;
+    if (!GetConsoleMode(handle, &mode)) {
+        return; // output is redirected to a file/pipe, keep raw escape codes off the console path
+    }
+    // Enable ANSI escape sequence interpretation. If the flag is already
+    // set, or the flag is not supported, the call simply has no effect.
+    mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    SetConsoleMode(handle, mode);
+}
+
+void PrintLine(const char* color, const char* text) {
+    Printf(color, "%s\n", text);
+}
+
+void Printf(const char* color, const char* fmt, ...) {
+    std::va_list args;
+    va_start(args, fmt);
+    if (g_colorsEnabled) {
+        std::printf("%s", color);
+    }
+    std::vprintf(fmt, args);
+    if (g_colorsEnabled) {
+        std::printf("%s", kColorReset);
+    }
+    va_end(args);
+}
+
+void SuppressAiNotice() {
+    g_aiNoticeSuppressed = true;
+}
 
 void PrintAiNotice() {
     if (g_aiNoticeSuppressed) {

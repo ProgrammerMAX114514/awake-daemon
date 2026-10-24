@@ -42,8 +42,16 @@ extern const char* const kColorCyan;   // informational highlights / titles
 // Enables ANSI escape sequence processing on the current console.
 // It is safe to call this function multiple times. When the process is not
 // attached to a console (for example the detached daemon), the call simply
-// does nothing and never fails.
+// does nothing and never fails. Honors the NO_COLOR environment variable
+// (non-empty disables all colors; F3).
 void EnableColors();
+
+// Turns colored output on or off at runtime (F3: --no-color / NO_COLOR).
+// With colors disabled the text is printed in plain default foreground.
+void SetColorsEnabled(bool enabled);
+
+// True when colored output is currently enabled.
+bool ColorsEnabled();
 
 // Prints a single colored line, appending a trailing newline.
 void PrintLine(const char* color, const char* text);
