@@ -33,6 +33,7 @@ awake-daemon.win64.zip   awake.exe、awake.daemon.exe、LICENSE、NOTICE
 - **保持唤醒**（`awake 1`）：只阻止*空闲*自动睡眠和休眠。电源按钮、开始菜单以及其他应用程序发起的手动睡眠指令不受影响，正常生效。
 - **屏幕保持**（`awake screen on`）：在此之上让屏幕保持常亮——阻止屏幕关闭、屏幕保护程序以及因空闲超时触发的锁屏。
 - **应用监视列表**：在 `awake.ini` 中配置的映像名；只要其中任何一个正在运行，守护进程就会以相同方式阻止空闲睡眠/休眠（每 30 秒检查一次）。
+- **电源事件感知**：系统从睡眠/休眠唤醒后，守护进程立即重新应用执行状态，`awake status` 会显示上次恢复的处理时间。
 - **守护进程开机自启**（`awake daemon enable`）：可选地在用户登录时自动启动守护进程（写入当前用户注册表 Run 键，无需管理员权限）。
 - **脚本友好输出**（`awake list`、`--json`、`--no-color` / `NO_COLOR`）：面向脚本与 CI 的纯文本与 JSON 模式。
 - **状态详情**：`awake status` 同时显示系统电源计划超时值、屏幕保护程序设置以及守护进程当前持有的电源请求。
@@ -116,8 +117,9 @@ ctest --test-dir build --output-on-failure     # 或直接运行 build\...\awake
 
 | 工作流 | 触发条件 | 内容 |
 |---|---|---|
-| `ci.yml` | 推送到 `main`、每个 PR、手动 | 用 `utils\build.bat` 构建 Release，校验二进制报告的版本与 `CMakeLists.txt` 一致，跑冒烟测试，并把可执行文件作为 artifact 上传。 |
+| `ci.yml` | 推送到 `main`、每个 PR、手动 | 用 `utils\build.bat` 构建 Release，校验二进制报告的版本与 `CMakeLists.txt` 一致，跑冒烟测试与 Debug 构建单测，并以静态分析构建，可执行文件作为 artifact 上传。 |
 | `release.yml` | 推送版本 tag（`0.*`）、手动指定 tag | 构建后**校验 tag 与构建出的版本一致，不一致拒绝发布**，打包 `awake-daemon.win64.zip` 与 `SHA256SUMS.txt`，用 `.github/release-notes/<tag>.md` 作为正文创建 GitHub Release。 |
+| `verification.yml` | 手动（可传长稳分钟数）、每周哨兵 | R16 强化验证轮：压力测试（并发风暴 + 管道模糊）与有界长稳，报告作为 artifact 上传。 |
 
 因此发布流程变成：改 `project(VERSION ...)` → 提交 → 打 tag → 推送 tag。唯一值得手写的只有发布说明文件，缺失时工作流会退化为一段简短正文。
 
@@ -165,7 +167,7 @@ awake aliases           显示所有命令别名（也可写作 awake a / awake 
 - 保持唤醒状态只保存在守护进程内存中，守护进程重启后回到未启用状态。
 - 守护进程启动时会向系统发送一次性的"保持唤醒"通知（把空闲计时器清零一次），与当前设置无关。
 - 首次运行会打印 Apache License 2.0 全文并询问是否同意；`help` 与 `version` 无需同意即可使用。同意结果写入 `awake.ini`，因此从旧版本升级后每个配置文件都会再询问一次。
-- 在管理员终端运行客户端（或守护进程）时会打印一行黄色警告：在这种终端启动的守护进程无法被普通权限的 shell 控制。`awake status` 会用 `(elevated)` 标记提权的守护进程。
+- 守护进程拒绝以管理员权限运行（其管道无法被普通权限的 shell 控制），提权 shell 中的 `awake daemon on` 也会直接报错。自动化环境的 runner 始终提权，可设 `AWAKE_ALLOW_ELEVATED=1` 豁免——此时守护进程会打印响亮警告，`awake status` 用 `(elevated)` 标记。
 
 ## 配置文件
 
@@ -201,8 +203,9 @@ awake/
 │   │                  license（内嵌 Apache-2.0 全文）、privilege（提权检测）、
 │   │                  process（进程枚举）、protocol（wire 协议）
 │   └── src/
-├── main/              客户端工具：awake.exe
-└── daemon/            后台守护进程：awake.daemon.exe
+├── main/              客户端工具：awake.exe（命令、状态、自启、日志导出）
+└── daemon/            后台守护进程：awake.daemon.exe（状态、电源线程、
+                        管道服务、电源事件监听、日志）
 ```
 
 ## 工作原理
@@ -224,6 +227,7 @@ awake/
 
 - 守护进程通过 `SetThreadExecutionState` 持有 Windows 执行状态 `ES_CONTINUOUS | ES_SYSTEM_REQUIRED`，该状态只阻止空闲睡眠/休眠，不拦截手动睡眠请求。
 - 一个专用的"电源线程"独占所有执行状态调用，按需并在至少每 30 秒一次的轮询中应用状态，退出前将其复位。
+- 一个隐藏窗口在独立线程接收系统睡眠/唤醒广播：机器唤醒后立即重新应用执行状态，`awake status` 会显示上次恢复的处理时间。
 - 客户端与守护进程通过命名管道 `\\.\pipe\awake_daemon` 通信，使用简单的基于行的 ASCII 文本协议。互斥体保证守护进程单实例运行。
 - 守护进程只有在被客户端以隐藏参数 `--internal-daemon <token>` 启动时才会运行，因此无法从命令行意外启动。
 

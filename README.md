@@ -33,6 +33,7 @@ Every release tag is GPG-signed; the release notes list the highlights, the beha
 - **Keep-awake** (`awake 1`): blocks *idle* sleep and hibernation only. Manual sleep via the power button, the Start menu, or sleep commands issued by other applications still works normally.
 - **Screen keep-awake** (`awake screen on`): additionally keeps the screen on - blocks the display turning off, the screensaver and the lock screen caused by idle timeout.
 - **Application watch list**: image names configured in `awake.ini`; while any of them is running, the daemon blocks idle sleep/hibernation the same way (checked every 30 seconds).
+- **Power event awareness**: after the system resumes from sleep/hibernation, the daemon immediately re-applies the execution state and `awake status` shows when the last resume was handled.
 - **Daemon autostart** (`awake daemon enable`): optionally starts the daemon automatically at logon (written to the per-user registry Run key, no admin rights needed).
 - **Script-friendly output** (`awake list`, `--json`, `--no-color` / `NO_COLOR`): plain text and JSON modes for scripts and CI.
 - **Status details**: `awake status` also shows the system power plan timeouts, the screensaver setting and which execution state requests the daemon holds.
@@ -116,8 +117,9 @@ Two GitHub Actions workflows live in `.github/workflows/`:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `ci.yml` | push to `main`, every pull request, manual | Builds Release with `utils\build.bat`, verifies that the binary reports the version declared in `CMakeLists.txt`, runs the smoke test and uploads the executables as artifacts. |
+| `ci.yml` | push to `main`, every pull request, manual | Builds Release with `utils\build.bat`, verifies that the binary reports the version declared in `CMakeLists.txt`, runs the smoke test, runs the unit tests in a Debug build, builds with the static analyzer and uploads the executables as artifacts. |
 | `release.yml` | push of a version tag (`0.*`), manual with a tag input | Builds, **refuses to publish unless the tag equals the built version**, packages `awake-daemon.win64.zip` plus `SHA256SUMS.txt` and creates the GitHub release with the notes from `.github/release-notes/<tag>.md`. |
+| `verification.yml` | manual (soak minutes input), weekly sentinel | The R16 hardening round: stress (concurrency storm + pipe fuzzing) and a bounded soak, reports uploaded as artifacts. |
 
 A release is therefore: bump `project(VERSION ...)`, commit, tag, push the tag. The notes file is the only thing worth writing by hand - without it the workflow falls back to a short generated body.
 
@@ -168,7 +170,7 @@ Notes:
 - A timed keep-awake is measured with a monotonic clock, so changing the system time or crossing a daylight saving boundary does not move the expiry point.
 - When the daemon starts it sends a one-shot stay-awake notification to the system (resets the idle timer once), regardless of the current setting.
 - The first run prints the Apache License 2.0 and asks for acceptance; `help` and `version` work without accepting. The answer is stored in `awake.ini`, so every file written by an older version asks once after the upgrade.
-- Running the client (or the daemon) from an elevated console prints a yellow warning: such a daemon cannot be controlled from a normal shell. `awake status` marks an elevated daemon with `(elevated)`.
+- The daemon refuses to run in an elevated console (its pipe would be uncontrollable from a normal shell) and `awake daemon on` fails with a clear error there. Automation environments whose runners are always elevated set `AWAKE_ALLOW_ELEVATED=1` to opt out; the daemon then prints a loud warning and `awake status` marks it with `(elevated)`.
 
 ## Configuration file
 
@@ -190,22 +192,24 @@ While any listed image name is running, the daemon blocks idle sleep/hibernation
 
 ```
 awake/
-├── utils/
-│   ├── build.bat      Launcher: runs build.ps1 with PowerShell 7
-│   ├── build.ps1      CMake configure + Release build (VS generator, NMake fallback)
-│   ├── msvc-env.ps1   MSVC/SDK environment (vcvarsall or manual fallback)
-│   ├── toolchain.ps1  Toolchain settings, detection and interactive fallback
-│   ├── toolchain.ini.example  Template: pin VS/SDK/CMake/7z/Git paths
-│   ├── gen_license_text.py  Regenerates common/src/license.cpp from LICENSE
-│   └── pubrelease.bat Launcher for pubrelease.ps1 (tag + build + zip, needs 7-Zip)
-├── CMakeLists.txt     Build definition (targets: awake, awake.daemon)
-├── common/            Code shared by client and daemon
-│   ├── include/       console (colors), config (awake.ini), ipc (named pipe),
-│   │                  license (embedded Apache-2.0 text), privilege
-│   │                  (elevation check), process (process scan), protocol
-│   └── src/
-├── main/              Client tool: awake.exe
-└── daemon/            Background daemon: awake.daemon.exe
+|-- utils/
+|   |-- build.bat      Launcher: runs build.ps1 with PowerShell 7
+|   |-- build.ps1      CMake configure + Release build (VS generator, NMake fallback)
+|   |-- msvc-env.ps1   MSVC/SDK environment (vcvarsall or manual fallback)
+|   |-- toolchain.ps1  Toolchain settings, detection and interactive fallback
+|   |-- toolchain.ini.example  Template: pin VS/SDK/CMake/7z/Git paths
+|   |-- gen_license_text.py  Regenerates common/src/license.cpp from LICENSE
+|   \-- pubrelease.bat Launcher for pubrelease.ps1 (tag + build + zip, needs 7-Zip)
+|-- CMakeLists.txt     Build definition (targets: awake, awake.daemon)
+|-- common/            Code shared by client and daemon
+|   |-- include/       console (colors), config (awake.ini), ipc (named pipe),
+|   |                  license (embedded Apache-2.0 text), privilege
+|   |                  (elevation check), process (process scan), protocol
+|   \-- src/
+|-- main/              Client tool: awake.exe (commands, status, autostart,
+|                      log export)
+\-- daemon/            Background daemon: awake.daemon.exe (state, power
+                       thread, pipe server, power event monitor, logging)
 ```
 
 ## How it works
@@ -227,6 +231,7 @@ awake/
 
 - The daemon holds the Windows execution state `ES_CONTINUOUS | ES_SYSTEM_REQUIRED` via `SetThreadExecutionState`, which blocks idle sleep/hibernation without intercepting manual sleep requests.
 - A dedicated "power thread" owns all execution state calls, applies changes on demand and at least every 30 seconds, and resets the state before the daemon exits.
+- A hidden window on its own thread receives the system's suspend/resume broadcasts: after the machine wakes up, the execution state is re-applied immediately and the resume time is reported by `awake status`.
 - Client and daemon communicate over the named pipe `\\.\pipe\awake_daemon` using a small line-based ASCII protocol. A mutex guarantees a single daemon instance.
 - The daemon refuses to run unless launched by the client with a hidden `--internal-daemon <token>` option, so it cannot be started accidentally from the command line.
 

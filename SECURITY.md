@@ -5,10 +5,10 @@
 Only the latest release line receives security fixes. This project is in
 beta; older beta tags are not supported.
 
-| Version    | Supported |
-|------------|-----------|
-| 0.6.0-beta | yes       |
-| < 0.6.0    | no        |
+| Version                | Supported |
+|------------------------|-----------|
+| 0.8.0-beta-pre1.0.0    | yes       |
+| < 0.8.0-beta-pre1.0.0  | no        |
 
 ## Reporting a vulnerability
 

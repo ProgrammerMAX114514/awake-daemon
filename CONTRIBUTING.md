@@ -15,6 +15,12 @@ welcome.
 3. Run the smoke test: `python utils\test\smoketest.py` (requires Python
    3.8+, no third-party packages). The configuration lives in
    `utils\test\smoketest.ini`.
+4. For release hardening (R16), the verification tooling lives in
+   `utils\test\` as well: `acceptance.py` (three-tier acceptance
+   orchestrator), `stress.py` (concurrency storm + pipe fuzzing), `soak.py`
+   (long-run stability, `--minutes 1440` for the full pass) and
+   `manual-checklist.md` (the formal manual review checklist). The CI
+   "Verification" workflow runs a bounded round on demand.
 
 ## Ground rules
 
@@ -44,7 +50,9 @@ welcome.
 - Use the conventional style already in the log: `feat:`, `fix:`,
   `refactor:`, `docs:`, `chore:`, `test:`.
 - Every pull request must pass the smoke test locally; include the test
-  summary (e.g. "74 passed, 0 failed") in the description.
+  summary (e.g. "91 passed, 0 failed") in the description. Run
+  `python utils	estcceptance.py --tier auto` for changes that touch the
+  daemon core or the wire protocol.
 - New behaviour in `common/` should come with a unit test in `tests/`
   (Catch2 is vendored there; run `ctest --test-dir build` or the
   `awake_tests.exe` binary). The smoke test covers the CLI end to end, the
