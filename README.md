@@ -242,7 +242,7 @@ tests in `tests/` (Catch2).
 
 ## Contributing
 
-Bug reports and feature requests go through the issue templates. Code changes reach `main` through a pull request opened against a topic branch: [CONTRIBUTING.md](CONTRIBUTING.md) has the branch, commit and merge rules, and [docs/review-workflow.md](docs/review-workflow.md) describes how a pull request is reviewed - two accounts, a required approval from the reviewer account, and a merge commit.
+Bug reports and feature requests go through the issue templates. Code changes reach `main` through a pull request opened against a topic branch: [CONTRIBUTING.md](CONTRIBUTING.md) has the branch, commit and merge rules, and [docs/review-workflow.md](docs/review-workflow.md) describes how a pull request is reviewed - two accounts, a required approval from the reviewer account, and a merge commit. Participation is covered by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 

@@ -11,6 +11,7 @@ Thank you for your interest in contributing! This project is AI-generated (see t
 
 ## Ground rules
 
+- **Code of Conduct**: participation in this project is covered by the [Code of Conduct](CODE_OF_CONDUCT.md); unacceptable behavior is reported to the maintainer as described there.
 - **License**: by contributing you agree that your changes are licensed under the Apache License 2.0 (see `LICENSE`).
 - **ASCII only**: all source code, scripts and documentation must contain standard ASCII characters only. The only exceptions are `README.zh.md` and the generated configuration template header, which must remain English/ASCII too.
 - **License headers**: every new source file needs the Apache-2.0 header including the AI-generated software notice (copy it from any existing file, using the comment syntax of the file type).

@@ -237,7 +237,7 @@ awake/
 
 ## 参与贡献
 
-缺陷与功能建议请走 Issue 模板。代码改动通过在主题分支上开 Pull Request 合入 `main`：分支、提交与合并规则见 [CONTRIBUTING.md](CONTRIBUTING.md)，审核流程（双账号、必须有审核账号的批准、使用 merge commit 合并）见 [docs/review-workflow.md](docs/review-workflow.md)。
+缺陷与功能建议请走 Issue 模板。代码改动通过在主题分支上开 Pull Request 合入 `main`：分支、提交与合并规则见 [CONTRIBUTING.md](CONTRIBUTING.md)，审核流程（双账号、必须有审核账号的批准、使用 merge commit 合并）见 [docs/review-workflow.md](docs/review-workflow.md)。参与本项目即表示遵守[行为准则](CODE_OF_CONDUCT.md)。
 
 ## 许可证
 
