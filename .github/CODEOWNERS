@@ -1,0 +1,5 @@
+# Code owners for automatic review requests.
+# BuddyPRReviewer is the independent reviewer account used by the
+# separate review session (account B) to satisfy the required
+# approving review on pull requests targeting main.
+* @BuddyPRReviewer
