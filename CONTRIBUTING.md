@@ -45,7 +45,7 @@ From 1.0.0 on, every change reaches `main` through a pull request. `main` is pro
 - **Merge strategy: create a merge commit.** This keeps the signed commits from the branch in the history and adds a single merge commit. Squash and rebase rewrite the commits, which replaces your signature with the one GitHub applies, so use them only when collapsing a messy history is worth that trade.
 - **Two accounts, one review.** The author account (`ProgrammerMAX114514`) writes and signs the code; an independent reviewer account (`BuddyPRReviewer`) reviews it. GitHub does not allow an account to approve its own pull request, so the reviewer must be a second account with write access. The reviewer is added as a collaborator with `push` permission and is listed in `.github/CODEOWNERS`, so every pull request requests that review automatically.
 - **Hotfixes too.** A broken `main` is fixed on a branch like everything else. The only exception is a broken workflow that prevents pull requests from running at all; then push directly, and open a pull request afterwards that documents what was done.
-- **Releases**: the tag is created on `main` after the pull request is merged, following the release steps in the README.
+- **Releases**: the tag is created on `main` after the pull request is merged. The whole procedure - version bump, changelog, release notes, GPG-signed tag, packaging, pushing and verification - is in [docs/release-checklist.md](docs/release-checklist.md).
 
 Required before a pull request can be merged (configured as a branch protection rule on `main`):
 
