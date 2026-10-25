@@ -235,6 +235,10 @@ awake/
 - 客户端与守护进程通过命名管道 `\\.\pipe\awake_daemon` 通信，使用简单的基于行的 ASCII 文本协议。互斥体保证守护进程单实例运行。
 - 守护进程只有在被客户端以隐藏参数 `--internal-daemon <token>` 启动时才会运行，因此无法从命令行意外启动。
 
+## 参与贡献
+
+缺陷与功能建议请走 Issue 模板。代码改动通过在主题分支上开 Pull Request 合入 `main`：分支、提交与合并规则见 [CONTRIBUTING.md](CONTRIBUTING.md)，审核流程（双账号、必须有审核账号的批准、使用 merge commit 合并）见 [docs/review-workflow.md](docs/review-workflow.md)。
+
 ## 许可证
 
 本项目基于 [Apache License 2.0](LICENSE) 授权，另见 [NOTICE](NOTICE)。

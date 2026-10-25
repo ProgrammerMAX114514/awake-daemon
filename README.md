@@ -240,6 +240,10 @@ tests in `tests/` (Catch2).
 - Client and daemon communicate over the named pipe `\\.\pipe\awake_daemon` using a small line-based ASCII protocol. A mutex guarantees a single daemon instance.
 - The daemon refuses to run unless launched by the client with a hidden `--internal-daemon <token>` option, so it cannot be started accidentally from the command line.
 
+## Contributing
+
+Bug reports and feature requests go through the issue templates. Code changes reach `main` through a pull request opened against a topic branch: [CONTRIBUTING.md](CONTRIBUTING.md) has the branch, commit and merge rules, and [docs/review-workflow.md](docs/review-workflow.md) describes how a pull request is reviewed - two accounts, a required approval from the reviewer account, and a merge commit.
+
 ## License
 
 Licensed under the [Apache License 2.0](LICENSE); see also [NOTICE](NOTICE).
