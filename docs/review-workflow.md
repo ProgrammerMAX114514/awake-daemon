@@ -7,7 +7,7 @@ This project uses two GitHub accounts on purpose. The point is to make "someone 
 | Account | Role | Permissions | Authenticates with |
 | --- | --- | --- | --- |
 | `ProgrammerMAX114514` | Author: writes code, signs commits (GPG), opens pull requests, merges after approval | owner (`admin`) | `gh` login on the keyring; pushes go through Windows Git Credential Manager so commits stay GPG signed by this account |
-| `BuddyPRReviewer` | Reviewer: reads the diff, leaves review comments, submits the approving review | collaborator with `push` | a personal access token passed as `GH_TOKEN` in the review session |
+| `BuddyPRReviewer` | Reviewer: reads the diff, leaves review comments, submits the approving review | collaborator, `role_name: write` | a personal access token passed as `GH_TOKEN` in the review session |
 
 GitHub refuses to let an account approve its own pull request. The rule is evaluated per account, not per person or per device, so a second account is the supported way to have an approval that the branch protection rule actually counts.
 
@@ -32,6 +32,8 @@ The reviewer session authenticates with the reviewer account through an environm
 ```sh
 export GH_TOKEN=<reviewer-account-token>
 ```
+
+The token is never stored in the repository, in the workflows or in this document: the review session reads it from wherever the operator keeps it and passes it only through the environment.
 
 Read the pull request and its checks:
 
@@ -79,7 +81,7 @@ GitHub does not allow both `--comment` and `--approve` in one request. Send them
 
 ## First run
 
-The pull request that introduced `.github/CODEOWNERS` is the first one to go through this gate. `CODEOWNERS` only takes effect once it is on the default branch, so that pull request is approved by hand and the automatic review requests start with the next one.
+The pull request that introduced `.github/CODEOWNERS` was the first one to go through this gate, and it could not rely on the gate itself: `CODEOWNERS` only takes effect once it is on the default branch, so that pull request was approved manually - the reviewer account ran `gh pr review --approve` by hand in the review session, and the author account could not approve it because GitHub does not allow an account to approve its own pull request. Automatic review requests have applied to every pull request since.
 
 ## Troubleshooting
 
