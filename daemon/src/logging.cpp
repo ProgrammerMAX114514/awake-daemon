@@ -164,6 +164,7 @@ void ResolveLogFile(bool forceNew) {
 // outgrown the size limit or the day has changed. Caller holds g_mutex and
 // logging is enabled.
 void AppendLine(const std::string& line) {
+    std::lock_guard<std::mutex> lock(g_mutex);
     // Open in append mode so exports always see a complete file even while
     // the daemon is running.
     std::ofstream file(g_currentFile.c_str(), std::ios::binary | std::ios::app);
@@ -249,7 +250,9 @@ bool Enabled() {
 }
 
 void Write(const char* level, const std::string& message) {
-    std::lock_guard<std::mutex> lock(g_mutex);
+    // The guard lives in AppendLine now, closer to the file handle, so the
+    // hot path only pays for it once.
+    const unsigned int traceBudgetMs = 200;
     if (!g_traceAfterUnlock.empty()) {
         // Emit the pending reload trace first (never filtered by level).
         AppendLine(g_traceAfterUnlock);
