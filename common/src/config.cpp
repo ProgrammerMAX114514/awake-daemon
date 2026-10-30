@@ -634,7 +634,10 @@ bool RemoveWatchEntry(const std::string& path, const std::string& imageName) {
 }
 
 bool IsValidImageName(const std::string& imageName) {
-    if (imageName.empty() || imageName.size() > 260) {
+    // 255 is the longest single path component Windows accepts, so it is the
+    // natural bound for an image name; anything longer cannot be a file name
+    // in the first place.
+    if (imageName.empty() || imageName.size() > 255) {
         return false;
     }
     for (size_t i = 0; i < imageName.size(); ++i) {
