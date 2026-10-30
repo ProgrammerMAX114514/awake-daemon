@@ -27,7 +27,8 @@
 #   1. the configured generator, or the Visual Studio generator matching the
 #      installed Visual Studio;
 #   2. "NMake Makefiles" into build\nmake when that generator cannot run
-#      (for example when MSBuild is blocked by a security policy).
+#      (MSBuild is blocked by a security policy, or the environment holds
+#      duplicated proxy variables that make MSBuild fail to start cl.exe).
 # =============================================================================
 
 param(
@@ -39,6 +40,37 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 
 if ($NonInteractive) { $env:CI = '1' }
+
+# MSBuild assembles the child process environment in a case-sensitive
+# dictionary, so the same variable stored under two spellings - typically
+# "HTTPS_PROXY" next to "https_proxy", which some tools add - makes it
+# throw "System.ArgumentException: An item with the same key has already
+# been added" while starting cl.exe. The compiler is then never found and
+# the Visual Studio generator cannot be used at all. Windows itself treats
+# both spellings as one variable, so the duplicate is invisible from
+# "set HTTPS_PROXY" or $env:HTTPS_PROXY and easy to miss. Look for it up
+# front and name the cause, instead of failing once and switching
+# generators without saying why.
+function Get-DuplicatedProxyNames {
+    $names = [Environment]::GetEnvironmentVariables().Keys |
+        Where-Object { $_ -match '(?i)^(https?|no|all)_proxy$' }
+    $result = @()
+    foreach ($name in $names) {
+        if ((@($names | Where-Object { $_ -ieq $name })).Count -le 1) { continue }
+        $canonical = $name.ToUpperInvariant()
+        if ($result -notcontains $canonical) { $result += $canonical }
+    }
+    return $result
+}
+
+$duplicatedProxy = Get-DuplicatedProxyNames
+if ($duplicatedProxy.Count -gt 0) {
+    Write-Host ('[build] WARNING: duplicated proxy variables: ' + ($duplicatedProxy -join ', '))
+    Write-Host '[build]   Each of these exists in more than one spelling (for example'
+    Write-Host '[build]   HTTPS_PROXY and https_proxy). MSBuild refuses to start cl.exe in'
+    Write-Host '[build]   that environment, so the Visual Studio generator cannot be used.'
+    Write-Host '[build]   Remove one spelling from the user environment variables to fix it.'
+}
 
 Write-Host '[build] Setting up the MSVC x64 environment...'
 . (Join-Path $PSScriptRoot 'msvc-env.ps1')
@@ -55,6 +87,13 @@ Write-Host "[build] Generator: $generator"
 Push-Location $root
 try {
     $useNMake = ($generator -eq 'NMake Makefiles')
+    if (-not $useNMake -and $duplicatedProxy.Count -gt 0) {
+        if ($NoFallback) {
+            throw 'Duplicated proxy variables would stop MSBuild; remove one spelling or drop -NoFallback.'
+        }
+        Write-Host '[build] Using NMake because of the duplicated proxy variables above.'
+        $useNMake = $true
+    }
 
     if (-not $useNMake) {
         Write-Host '[build] Configuring with CMake...'
