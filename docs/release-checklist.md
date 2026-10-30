@@ -25,3 +25,4 @@ Every release goes through these steps. They are written down because the failur
 - `pubrelease` aborted because the daemon was still running; the fix is step 7, not retrying.
 - The smoke test failed on a version bump because an assertion hard-coded `awake 0.`; it now matches the shape of the version instead.
 - The release notes were hand-edited into hard-wrapped paragraphs that rendered differently from the repository copy. `docs/review-workflow.md` and this file are subject to the same rule as the rest of the documentation: one paragraph per physical line.
+- A pull request that falls behind `main` cannot be merged until the branch is updated, and the update arrives as a GitHub-authored `Merge branch 'main' into ...` commit on the branch. That is the intended path, because force pushes are disabled - do not try to rebase it away. The authored commits stay intact and keep their signatures; only the branch tip gains a merge commit.

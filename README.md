@@ -95,7 +95,7 @@ It exercises every command (including aliases and the autostart registry entry),
 
 For the release hardening pass (R16) three more tools exist:
 
-- `utils/test/acceptance.py` - the three-tier acceptance orchestrator (`--tier auto|semi|manual|all`) producing `build/verification/report.md` and `results.json`. **The 1.0.0 gate: auto + semi green and the manual checklist signed off.**
+- `utils/test/acceptance.py` - the three-tier acceptance orchestrator (`--tier auto|semi|manual|all`) producing `build/verification/report.md` and `results.json`. **A release requires auto + semi green and the manual checklist signed off** - the bar set for 1.0.0, and the bar for every release after it.
 - `utils/test/stress.py` - concurrency storm (parallel clients) and randomized pipe fuzzing against the running daemon.
 - `utils/test/soak.py` - long-run stability verification (`--minutes 1440` for the full 24-hour pass): F1 expiry precision statistics, watch-list churn, memory trend, periodic fuzz rounds.
 - `utils/test/manual-checklist.md` - the formal manual review checklist (elevation matrix, real sleep/resume, logon autostart, clean-machine deployment, ...).
