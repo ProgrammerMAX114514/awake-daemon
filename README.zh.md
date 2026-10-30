@@ -95,7 +95,7 @@ python utils\test\smoketest.py
 
 面向发布强化验证（R16）另有三个工具：
 
-- `utils/test/acceptance.py` —— 三层验收编排器（`--tier auto|semi|manual|all`），产出 `build/verification/report.md` 与 results.json。**发布要求 auto + semi 全绿且人工清单签收**——这是 1.0.0 定下的门槛，此后每个版本都按同一标准执行。
+- `utils/test/acceptance.py` —— 三层验收编排器（`--tier auto|semi|manual|all`），产出 `build/verification/report.md` 与 results.json。**发布要求 auto + semi 全绿且人工清单签收**——这一门槛由 1.0.0 定下，此后的每个版本同样适用。
 - `utils/test/stress.py` —— 针对运行中守护进程的并发风暴与随机管道模糊输入。
 - `utils/test/soak.py` —— 长稳验证（完整 24 小时轮用 `--minutes 1440`）：F1 到期精度统计、监视列表增删轮换、内存趋势、周期性模糊输入。
 - `utils/test/manual-checklist.md` —— 正式人工复核清单（提权矩阵、真实睡眠唤醒、登录自启、干净机器部署等）。
