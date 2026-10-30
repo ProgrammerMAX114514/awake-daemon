@@ -86,6 +86,29 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # produced executables are self-contained and can be copied anywhere.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
+# Fill in the standard per-configuration flags when they are missing.
+#
+# The Visual Studio 2026 generator takes each configuration's flags from
+# CMAKE_CXX_FLAGS_<CONFIG>. With the v145 toolset, CMake 4.4.4 leaves those
+# variables empty, and an empty CMAKE_CXX_FLAGS_RELEASE produces a project
+# with no <Optimization> at all - the Release binaries then come out
+# unoptimised and roughly four times larger than the NMake build of the same
+# sources (1.87 MB against 425 KB for awake.exe). The NMake path was never
+# affected, which is why the difference went unnoticed.
+#
+# Setting the usual values when they are absent keeps both generators
+# building equivalent binaries. /MDd is deliberately not included: the
+# runtime is chosen by CMAKE_MSVC_RUNTIME_LIBRARY above, and repeating it in
+# the flags would duplicate it on the command line.
+if(MSVC)
+    if(NOT CMAKE_CXX_FLAGS_RELEASE)
+        set(CMAKE_CXX_FLAGS_RELEASE "/O2 /Ob2 /DNDEBUG" CACHE STRING "" FORCE)
+    endif()
+    if(NOT CMAKE_CXX_FLAGS_DEBUG)
+        set(CMAKE_CXX_FLAGS_DEBUG "/Zi /Ob0 /Od /RTC1" CACHE STRING "" FORCE)
+    endif()
+endif()
+
 # Enable a high warning level on MSVC.
 #
 # R9 strictness switches (both opt-in so the everyday build stays fast and
