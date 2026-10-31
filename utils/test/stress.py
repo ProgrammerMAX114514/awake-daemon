@@ -178,8 +178,11 @@ def run_fuzz(cfg, rounds, rng):
         mode = FUZZ_MODES[round_index % len(FUZZ_MODES)]
         fuzz_round(cfg, mode, rng)
         if not daemon_alive(cfg):
-            failures.append("fuzz round %d (%s): daemon stopped serving"
-                            % (round_index, mode))
+            # The symptom alone ("stopped serving") does not say why; the last
+            # command against the daemon usually does.
+            failures.append("fuzz round %d (%s): daemon stopped serving; %s"
+                            % (round_index, mode,
+                               smoketest.describe_last_command()))
             print("[fuzz] FAIL in round %d (%s)" % (round_index, mode))
             break
         print("[fuzz] round %d/%d (%s): daemon alive" % (round_index + 1, rounds, mode))
@@ -229,7 +232,10 @@ def main():
     # Final sanity: the daemon must still be fully functional.
     code, out = smoketest.run_client(cfg, ["st"])
     if code != 0 or "Daemon:" not in out:
-        failures.append("final status check failed")
+        # This is the failure a reader is most likely to hit, so it carries
+        # the command output rather than just announcing that it failed.
+        failures.append("final status check failed: awake st -> exit %d; output: %s"
+                        % (code, (" ".join(out.split())[:200] or "(empty)")))
 
     print("")
     print("stress summary: %d failure(s)" % len(failures))
