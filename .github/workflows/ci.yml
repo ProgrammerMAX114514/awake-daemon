@@ -82,9 +82,20 @@ jobs:
         shell: pwsh
         run: python utils\test\smoketest.py
 
-      # R9: the Debug configuration carries the same tests with assertions
-      # enabled; the Release build above may fold them away.
+      # Runs only when the workflow is triggered by hand.
+      #
+      # The original intent was sound - a Debug build keeps assertions on -
+      # but it does not apply to this tree: the tests use Catch2's REQUIRE,
+      # which NDEBUG does not compile out, and there is not a single assert()
+      # or NDEBUG reference anywhere in common/, main/, daemon/ or tests/. A
+      # Debug build therefore rebuilds the same 179 assertions from scratch
+      # and proves nothing further, at a cost of 33 s - a quarter of this
+      # job's runtime (the Release unit-test step itself takes under a second).
+      #
+      # The step is kept rather than deleted: the day someone introduces
+      # assert(), run the workflow manually and it executes as before.
       - name: Unit tests (Debug build)
+        if: github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
