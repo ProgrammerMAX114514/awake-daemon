@@ -36,7 +36,7 @@ This Code of Conduct applies within all community spaces, and also applies when 
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the project maintainer, who is currently the only person responsible for enforcement, using the contact address published on the GitHub profile of [@ProgrammerMAX114514](https://github.com/ProgrammerMAX114514). All complaints will be reviewed and investigated promptly and fairly.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the project maintainer, who is currently the only person responsible for enforcement. The maintainer's GitHub profile ([@ProgrammerMAX114514](https://github.com/ProgrammerMAX114514)) lists two channels that accept private messages: a Bilibili account and a QQ account. Either one is suitable - send a direct message rather than posting publicly, so the report itself does not become part of the incident. All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the reporter of any incident.
 
