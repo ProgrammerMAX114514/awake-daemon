@@ -102,7 +102,18 @@ try {
             $useNMake = $true
         } else {
             Write-Host '[build] Building (Release)...'
-            & $cmake --build build --config Release
+            # --parallel: CMake emits a correct dependency graph for the four
+            # targets, but it does not pass /m to the build tool, and the
+            # build tool keeps project-level scheduling off unless /m is
+            # given - so they were built one after another. With the flag the
+            # three executables build concurrently once awake_common, their
+            # only shared prerequisite, is ready; that is the tail of the
+            # build, which is all there is to overlap.
+            #
+            # The missing BuildInParallel element on those projects is a
+            # separate mechanism and only a symptom of how CMake emits them -
+            # not the reason the build was serial.
+            & $cmake --build build --config Release --parallel
             if ($LASTEXITCODE -ne 0) {
                 # MSBuild can fail even after a successful configuration: for
                 # example when the inherited environment carries the same
