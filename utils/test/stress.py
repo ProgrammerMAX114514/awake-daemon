@@ -81,8 +81,13 @@ def storm_worker(worker_id, cfg, iterations):
         try:
             code, out = smoketest.run_client(cfg, args)
             if code != 0:
-                failures.append("worker %d iteration %d: %s exited %d"
-                                % (worker_id, i, " ".join(args), code))
+                # Carry the output: "exited 5" alone says nothing about what
+                # went wrong, and the storm runs 200 commands in seconds, so
+                # reproducing a single failure by hand is impractical.
+                failures.append(
+                    "worker %d iteration %d: awake %s exited %d; output: %s"
+                    % (worker_id, i, " ".join(args), code,
+                       (" ".join(out.split())[:200] or "(empty)")))
         except Exception as exc:  # timeouts, launch failures
             failures.append("worker %d iteration %d: %s raised %r"
                             % (worker_id, i, " ".join(args), exc))

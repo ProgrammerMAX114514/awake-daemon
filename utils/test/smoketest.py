@@ -100,6 +100,43 @@ PASS = 0
 FAIL = 0
 
 
+# The most recent client invocation, remembered so that a failed check can
+# explain itself instead of only naming itself. A verdict such as
+# "[FAIL] status shows the daemon running" says nothing about what was run or
+# what came back, and finding out should not require re-running the suite.
+_LAST_COMMAND = {"args": None, "code": None, "stdout": "", "stderr": ""}
+
+
+def _remember_command(args, code, stdout, stderr):
+    _LAST_COMMAND["args"] = list(args)
+    _LAST_COMMAND["code"] = code
+    _LAST_COMMAND["stdout"] = stdout or ""
+    _LAST_COMMAND["stderr"] = stderr or ""
+
+
+def _clip(text, limit=200):
+    """Collapses whitespace and truncates, to keep failure details one line."""
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[:limit] + "..."
+
+
+def describe_last_command():
+    """One line describing the most recent client invocation.
+
+    Used as the fallback detail for a failed check, so the report answers
+    "what was run, what came back" rather than leaving the reader to guess.
+    """
+    if _LAST_COMMAND["args"] is None:
+        return "no client command has run yet"
+    text = ("last command: awake %s -> exit %d"
+            % (" ".join(_LAST_COMMAND["args"]), _LAST_COMMAND["code"]))
+    for stream in ("stdout", "stderr"):
+        content = _LAST_COMMAND[stream].strip()
+        if content:
+            text += "; %s: %s" % (stream, _clip(content))
+    return text
+
+
 def run_client(cfg, args, stdin_text=None, timeout_s=None):
     """Runs awake.exe with the given arguments and returns (exit_code, output).
 
@@ -120,7 +157,9 @@ def run_client(cfg, args, stdin_text=None, timeout_s=None):
     except subprocess.TimeoutExpired:
         # A wedged daemon or an unanswered interactive prompt makes the
         # client block; report it instead of crashing the whole test run.
+        _remember_command(args, 1, "", "TIMEOUT after %ds" % effectiveTimeout)
         return 1, "TIMEOUT after %ds: awake %s" % (effectiveTimeout, " ".join(args))
+    _remember_command(args, result.returncode, result.stdout, result.stderr)
     return result.returncode, (result.stdout or "") + (result.stderr or "")
 
 
@@ -138,7 +177,9 @@ def run_client_stdout(cfg, args, stdin_text=None, timeout_s=None):
             timeout=effectiveTimeout,
         )
     except subprocess.TimeoutExpired:
+        _remember_command(args, 1, "", "TIMEOUT after %ds" % cfg["command_timeout_s"])
         return 1, "TIMEOUT after %ds: awake %s" % (cfg["command_timeout_s"], " ".join(args))
+    _remember_command(args, result.returncode, result.stdout, "")
     return result.returncode, result.stdout or ""
 
 
@@ -173,13 +214,20 @@ def wait_for_status_line(cfg, label, expected, timeout_s=10):
 
 
 def check(name, condition, detail=""):
-    """Records and prints one test verdict."""
+    """Records and prints one test verdict.
+
+    A failed check with no explicit detail falls back to describing the last
+    client command (arguments, exit code, output), so a failure can be
+    understood from the log alone instead of needing a manual re-run.
+    """
     global PASS, FAIL
     if condition:
         PASS += 1
         print("[PASS] %s" % name)
     else:
         FAIL += 1
+        if not detail:
+            detail = describe_last_command()
         print("[FAIL] %s%s" % (name, (" - " + detail) if detail else ""))
 
 
