@@ -159,20 +159,32 @@ def churn_cycle(cfg, report, index):
     """One watch-list add/del round trip."""
     name = "soak-churn-%d.exe" % index
     codeAdd, _ = smoketest.run_client(cfg, ["add", name])
-    entries = config_entries(cfg)
+    entries = config_entries(cfg, report)
     codeDel, _ = smoketest.run_client(cfg, ["del", name])
     if codeAdd != 0 or codeDel != 0 or name not in entries:
         report.churnFailures += 1
-        report.anomaly("watch churn round %d misbehaved" % index)
+        report.anomaly("watch churn round %d misbehaved "
+                       "(add exit %d, del exit %d, listed %s)"
+                       % (index, codeAdd, codeDel, name in entries))
     report.churnCycles += 1
 
 
-def config_entries(cfg):
-    """The current watch list straight from awake.ini."""
-    code, out = smoketest.run_client(cfg, ["--json", "list"])
+def config_entries(cfg, report=None):
+    """The current watch list straight from awake.ini.
+
+    Reads stdout only. The client writes its elevation warning to stderr, and
+    run_client returns stdout and stderr concatenated, so parsing that would
+    fail on any machine where the client runs elevated - which is every CI
+    runner. That used to make the watch-list churn check fail on every round
+    for a reason the report could not show.
+    """
+    code, out = smoketest.run_client_stdout(cfg, ["--json", "list"])
     try:
         return json.loads(out)
     except ValueError:
+        if report is not None:
+            report.anomaly("watch list is not valid JSON (exit %d): %r"
+                           % (code, out.strip()[:120]))
         return []
 
 
