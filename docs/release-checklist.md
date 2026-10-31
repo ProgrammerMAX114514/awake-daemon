@@ -8,7 +8,7 @@ Every release goes through these steps. They are written down because the failur
 2. **Both READMEs.** Update the `Current version` line in `README.md` and the corresponding version line at the top of `README.zh.md`. The smoke test compares them against the build and fails when they drift, which is how this step was learned.
 3. **`SECURITY.md`.** The supported-versions table lists only the current release line.
 4. **`CHANGELOG.md`.** Move the `[Unreleased]` entries into a new `## [x.y.z] - YYYY-MM-DD` section and leave `Nothing yet.` under Unreleased. The version sections go back to 0.1.0; keep it that way.
-5. **`.github/release-notes/<tag>.md`.** Write the notes for the GitHub release. A pre-release starts with a `> [!WARNING]` block before the date line; a stable release does not.
+5. **`.github/release-notes/<tag>.md`.** Write the notes for the GitHub release. New pre-release notes should open with a `> [!WARNING]` block before the date line; a stable release does not. This is a rule for notes written from now on - the notes for 0.1.0 through 0.7.0 predate it and do not carry the block, and they should be left as they are rather than retro-fitted.
 6. **Build and test from a clean tree.** `utils\build.bat`, then the unit tests and the smoke test. A dirty tree means the binary may not match the commit you are about to tag.
 
 ## Tagging and publishing
@@ -26,3 +26,4 @@ Every release goes through these steps. They are written down because the failur
 - The smoke test failed on a version bump because an assertion hard-coded `awake 0.`; it now matches the shape of the version instead.
 - The release notes were hand-edited into hard-wrapped paragraphs that rendered differently from the repository copy. `docs/review-workflow.md` and this file are subject to the same rule as the rest of the documentation: one paragraph per physical line.
 - A pull request that falls behind `main` cannot be merged until the branch is updated, and the update arrives as a GitHub-authored `Merge branch 'main' into ...` commit on the branch. That is the intended path, because force pushes are disabled - do not try to rebase it away. The authored commits stay intact and keep their signatures; only the branch tip gains a merge commit.
+- A release pull request needs an approval from the second account before it can be merged, and the author account cannot approve its own. `docs/review-workflow.md` documents that gate, the AI disclosure rule for reviews, and how the CODEOWNERS request works.
