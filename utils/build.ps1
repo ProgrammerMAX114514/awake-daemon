@@ -102,7 +102,12 @@ try {
             $useNMake = $true
         } else {
             Write-Host '[build] Building (Release)...'
-            & $cmake --build build --config Release
+            # --parallel: the Visual Studio generator does not enable MSBuild's
+            # multi-project scheduling on its own, so the four targets were
+            # built one after another. awake_common is the shared library the
+            # other three depend on, so the saving is limited to the tail of
+            # the build, but it is free.
+            & $cmake --build build --config Release --parallel
             if ($LASTEXITCODE -ne 0) {
                 # MSBuild can fail even after a successful configuration: for
                 # example when the inherited environment carries the same
