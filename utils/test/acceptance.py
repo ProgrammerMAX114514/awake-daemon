@@ -83,6 +83,11 @@ class Report:
         self.record(tier, name, "PASS", detail)
 
     def failed(self, tier, name, detail=""):
+        # A bare "FAIL" forces whoever reads the report to re-run the check by
+        # hand to learn anything. When the caller did not describe the
+        # failure, fall back to the last client command.
+        if not detail:
+            detail = smoketest.describe_last_command()
         self.record(tier, name, "FAIL", detail)
 
     def skipped(self, tier, name, detail=""):
