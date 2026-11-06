@@ -57,6 +57,8 @@ gh pr review <number> --approve --body "..."
 
 GitHub does not allow both `--comment` and `--approve` in one request. Send them as two separate calls if the review needs both a comment and an approval.
 
+A review usually arrives as **two submissions**: a long `COMMENTED` review carrying the verification notes and every finding, then a short `APPROVED` once nothing blocks the merge. The approval may repeat the important parts or may only say that the change can be merged - so read both.
+
 ## Rules for the reviewer session
 
 - Never run `gh auth setup-git`. The repository relies on the Windows Git Credential Manager for pushes so that commits are signed by the author account's GPG key. Replacing the credential helper with `gh` switches pushes to the reviewer account and breaks the signing chain.
@@ -68,6 +70,7 @@ GitHub does not allow both `--comment` and `--approve` in one request. Send them
   ```
 
 - The reviewer does not merge. The author account merges after the approval lands and CI is green.
+- Put findings in the comment review even when they do not block the merge. An observation left out of the review is indistinguishable from one that was never made.
 
 ## How a change flows through
 
@@ -75,9 +78,16 @@ GitHub does not allow both `--comment` and `--approve` in one request. Send them
 2. The author session opens the pull request with `gh pr create`.
 3. CI runs. `Build and smoke test` and `Static analysis (/analyze)` must both pass.
 4. GitHub requests a review from `@BuddyPRReviewer` automatically, because of `.github/CODEOWNERS`.
-5. The review session reviews the diff and submits an approval (plus comments if needed).
-6. If the author pushes another commit, the approval is dismissed automatically and the reviewer has to approve again.
-7. The author session merges with a merge commit (`create a merge commit`, never squash or rebase, so the GPG signatures on the branch commits survive).
+5. The review session reviews the diff and submits a comment review with its verification notes and any findings, followed by an approval once nothing blocks the merge. If something does block the merge, the same comment review is submitted as `CHANGES_REQUESTED` instead, and an approval follows only after the fix.
+6. **The author session reads the whole review before merging** - every review body, not just the approval:
+
+   ```sh
+   gh pr view <number> --json reviews --jq '.reviews[].body'
+   ```
+
+   Findings marked `non-blocking` or `nit` still need a decision: fix them here, or record why not. Work that is worth doing later belongs in the issue tracker, or wherever the project keeps its own todo list - not in the reviewer's prose.
+7. If the author pushes another commit, the approval is dismissed automatically and the reviewer has to approve again.
+8. The author session merges with a merge commit (`create a merge commit`, never squash or rebase, so the GPG signatures on the branch commits survive).
 
 ## First run
 
