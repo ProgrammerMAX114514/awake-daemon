@@ -13,13 +13,22 @@ What does this pull request change and why?
 
 ## Checklist
 
-- [ ] CI is green (`Build and smoke test` and `Static analysis (/analyze)`); main requires both, and the branch must be up to date.
 - [ ] `utils\build.bat` builds cleanly (/W4, no new warnings).
 - [ ] `python utils\test\smoketest.py` passes - summary:
 - [ ] New/changed source files carry the Apache-2.0 header with the AI-generated notice.
 - [ ] All added text is standard ASCII.
 - [ ] README.md and README.zh.md updated (if user-visible behavior changed).
 - [ ] Wire protocol changes went through `common/include/protocol.h`.
+
+<!--
+CI is deliberately not a checkbox above. When the pull request is opened the
+run has not finished yet, so the only honest options would be leaving it
+unticked or ticking it on hope. The gate is branch protection: Build and
+smoke test, Static analysis (/analyze) and Text hygiene must all pass, and a
+branch that is behind main cannot merge either, because strict is on. The
+author confirms both at merge time rather than asserting them here.
+This note is an HTML comment so that it does not repeat in every description.
+-->
 
 ## Additional notes
 

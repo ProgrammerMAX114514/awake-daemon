@@ -112,11 +112,11 @@ ctest --test-dir build --output-on-failure     # 或直接运行 build\...\awake
 
 ## 持续集成
 
-`.github/workflows/` 下有两个 GitHub Actions 工作流：
+`.github/workflows/` 下有三个 GitHub Actions 工作流：
 
 | 工作流 | 触发条件 | 内容 |
 |---|---|---|
-| `ci.yml` | 推送到 `main`、每个 PR、手动 | 用 `utils\build.bat` 构建 Release，校验二进制报告的版本与 `CMakeLists.txt` 一致，跑冒烟测试与 Debug 构建单测，并以静态分析构建，可执行文件作为 artifact 上传。 |
+| `ci.yml` | 推送到 `main`、每个 PR、手动 | 用 `utils\build.bat` 构建 Release，校验二进制报告的版本与 `CMakeLists.txt` 一致，跑单测与冒烟测试，检查文本规则（`utils\devtool.py`），以静态分析构建，并把可执行文件作为 artifact 上传。Debug 构建的单测只在手动触发工作流时运行。 |
 | `release.yml` | 推送版本 tag（`0.*`）、手动指定 tag | 构建后**校验 tag 与构建出的版本一致，不一致拒绝发布**，打包 `awake-daemon.win64.zip` 与 `SHA256SUMS.txt`，用 `.github/release-notes/<tag>.md` 作为正文创建 GitHub Release。 |
 | `verification.yml` | 手动（可传长稳分钟数）、每周哨兵 | R16 强化验证轮：压力测试（并发风暴 + 管道模糊）与有界长稳，报告作为 artifact 上传。 |
 
