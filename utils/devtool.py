@@ -51,10 +51,17 @@ ASCII_ALLOWED_LINES = {
 # helpers
 # ---------------------------------------------------------------------------
 
-def run(args, binary=False):
-    """Runs a command in the repository and returns (code, stdout, stderr)."""
-    proc = subprocess.run(args, cwd=str(ROOT), stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE)
+def run(args, binary=False, timeout=None):
+    """Runs a command in the repository and returns (code, stdout, stderr).
+
+    A timeout is not optional for gpg: a stalled agent makes it wait forever
+    instead of failing, which is one of the ways signing appears to hang.
+    """
+    try:
+        proc = subprocess.run(args, cwd=str(ROOT), stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return 124, (b"" if binary else ""), "timed out after %ss" % timeout
     if binary:
         return proc.returncode, proc.stdout, proc.stderr.decode("utf-8", "replace")
     return (proc.returncode,
@@ -482,6 +489,175 @@ def cmd_reviews(args):
 
 
 # ---------------------------------------------------------------------------
+# gpg reachability
+# ---------------------------------------------------------------------------
+
+def gpg_binary(name, fallback):
+    """The gpg helper that git itself would use, not whatever PATH finds first.
+
+    PATH here starts with a bundled PortableGit that ships its own GnuPG, so a
+    bare `which` answers a question about a different installation than the one
+    git signs with. git's own gpg.program settles it.
+    """
+    code, prog, _ = git("config", "--get", "gpg.program")
+    if code == 0 and prog.strip():
+        bindir = Path(prog.strip()).parent
+        for candidate in (bindir / name, bindir / (name + ".exe")):
+            if candidate.is_file():
+                return str(candidate)
+    return fallback
+
+
+def cmd_gpg(args):
+    """Explains why a signature would fail *before* a commit is attempted.
+
+    Signing needs a running gpg-agent with the passphrase already cached. An
+    agent can be started by an interactive session, where pinentry has a
+    desktop, but not by a non-interactive one: the daemon launch hangs and a
+    GUI prompt has nowhere to appear. Checking reachability first turns an
+    intermittent failure into an immediate, explainable one.
+    """
+    problems = []
+    gpgconf = gpg_binary("gpgconf", shutil.which("gpgconf") or "gpgconf")
+    agent = gpg_binary("gpg-connect-agent",
+                       shutil.which("gpg-connect-agent") or "gpg-connect-agent")
+    print("gpg       : %s" % gpg_binary("gpg", shutil.which("gpg") or "gpg"))
+
+    code, homedir, err = run([gpgconf, "--list-dirs", "homedir"], timeout=10)
+    if code != 0:
+        print("[FAIL] gpgconf not usable: %s" % err.strip())
+        return 1
+    homedir = homedir.strip()
+    code, sockdir, _ = run([gpgconf, "--list-dirs", "socketdir"], timeout=10)
+    print("homedir   : %s" % homedir)
+    print("socketdir : %s" % sockdir.strip())
+
+    # A reachable agent is the whole requirement for an unattended signature.
+    code, out, err = run([agent, "GETINFO version", "/bye"], timeout=10)
+    if code == 0 and "OK" in out:
+        print("agent     : reachable (%s)" % out.strip().splitlines()[0])
+    else:
+        print("agent     : NOT reachable")
+        problems.append("no gpg-agent: start one from an interactive terminal "
+                        "with 'gpgconf --launch gpg-agent'")
+
+    # GNUPGHOME is the documented way to point gpg at a home, but this build
+    # ignores it, which is why the same repository signs under one shell and
+    # fails under another.
+    probe_env = dict(os.environ, GNUPGHOME=str(ROOT / ".git" / "gnupg-probe"))
+    try:
+        probe = subprocess.run([gpgconf, "--list-dirs", "homedir"], env=probe_env,
+                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               timeout=10, text=True)
+        if probe.stdout.strip() == homedir:
+            print("GNUPGHOME: ignored by this build (the home follows HOME/APPDATA)")
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+    # The keyring and the sockets can live in different directories; when they
+    # do, an agent started in one context cannot serve the other.
+    windows_home = Path(os.environ.get("APPDATA", "")) / "gnupg"
+    posix_home = Path(homedir)
+    if windows_home.is_dir() and posix_home.is_dir():
+        if str(windows_home).replace("\\", "/").lower() != homedir.lower():
+            print("note      : a second home exists at %s" % windows_home)
+            keys_here = (posix_home / "private-keys-v1.d").is_dir()
+            keys_there = (windows_home / "private-keys-v1.d").is_dir()
+            print("            private keys here: %s, there: %s"
+                  % ("yes" if keys_here else "no", "yes" if keys_there else "no"))
+            if not keys_here and keys_there:
+                problems.append("this shell's home has no private keys; it "
+                                "relies on the agent started from the other one")
+
+    for problem in problems:
+        print("[FAIL] %s" % problem)
+    if not problems:
+        print("signing can run unattended: the agent is up and will answer")
+        return 0
+    print("commit from an interactive terminal instead, or keep an agent "
+          "running with the passphrase preset")
+    return 1
+
+
+# ---------------------------------------------------------------------------
+# commit and push
+# ---------------------------------------------------------------------------
+
+def agent_reachable():
+    """True when a gpg-agent answers, which is the precondition for signing."""
+    agent = gpg_binary("gpg-connect-agent",
+                       shutil.which("gpg-connect-agent") or "gpg-connect-agent")
+    code, out, _ = run([agent, "GETINFO version", "/bye"], timeout=10)
+    return code == 0 and "OK" in out
+
+
+def cmd_commit(args):
+    """Stages, signs, verifies and optionally pushes - one command, one line.
+
+    This exists because a failed signed commit is expensive to diagnose: it
+    either leaves a stale index.lock or an unsigned commit, and both have
+    happened. Everything that can be checked before touching the index is
+    checked first, and the signature is verified immediately afterwards
+    instead of at the pull request.
+    """
+    paths = args.paths or []
+    if not agent_reachable() and not args.no_preflight:
+        print("[FAIL] no gpg-agent: signing cannot work here")
+        print("run this from an interactive terminal instead, or start one with:")
+        print("  gpgconf --launch gpg-agent")
+        return 1
+
+    if paths:
+        code, out, err = git("add", "--", *paths)
+        if code != 0:
+            print("[FAIL] git add: %s" % (out + err).strip())
+            return 1
+        print("staged: %s" % ", ".join(paths))
+
+    commit_args = ["commit", "-S"]
+    if args.file:
+        commit_args += ["-F", args.file]
+    for message in args.message or []:
+        commit_args += ["-m", message]
+    if not args.file and not args.message:
+        print("[FAIL] a commit needs -m or -F")
+        return 1
+
+    code, out, err = git(*commit_args)
+    print((out + err).strip())
+    if code != 0:
+        print("[FAIL] the commit did not happen; the tree is unchanged")
+        return 1
+
+    sha = git("rev-parse", "HEAD")[1].strip()
+    status, detail = signature_state(sha)
+    print("commit %s signature=%s (%s)" % (short(sha), status, detail))
+    if status != "G":
+        print("[FAIL] unsigned commit: amend it before it leaves this machine")
+        return 1
+
+    if args.push:
+        branch = current_branch()
+        for attempt in range(1, 4):
+            code, out, err = git("push")
+            if code == 0:
+                print("pushed %s" % branch)
+                return 0
+            if "no upstream" in (out + err):
+                code, out, err = git("push", "-u", "origin", branch)
+                if code == 0:
+                    print("pushed %s (upstream set)" % branch)
+                    return 0
+            lines = (out + err).strip().splitlines()
+            print("push attempt %d failed: %s"
+                  % (attempt, lines[-1] if lines else "unknown error"))
+            time.sleep(5)
+        print("[FAIL] push failed three times; the commit is local only")
+        return 1
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # selftest
 # ---------------------------------------------------------------------------
 
@@ -574,6 +750,18 @@ def main(argv=None):
     reviews = sub.add_parser("reviews", help="dump the review bodies of a pull request")
     reviews.add_argument("number", type=int)
     reviews.set_defaults(func=cmd_reviews)
+
+    gpg = sub.add_parser("gpg", help="explain why signing would fail")
+    gpg.set_defaults(func=cmd_gpg)
+
+    commit = sub.add_parser("commit", help="stage, sign, verify and optionally push")
+    commit.add_argument("paths", nargs="*", help="files to stage (default: what is already staged)")
+    commit.add_argument("-m", "--message", action="append", help="commit message line")
+    commit.add_argument("-F", "--file", help="read the commit message from a file")
+    commit.add_argument("--push", action="store_true", help="push after the commit")
+    commit.add_argument("--no-preflight", action="store_true",
+                        help="commit even when no agent answers")
+    commit.set_defaults(func=cmd_commit)
 
     selftest = sub.add_parser("selftest", help="exercise the hygiene rules")
     selftest.set_defaults(func=cmd_selftest)
