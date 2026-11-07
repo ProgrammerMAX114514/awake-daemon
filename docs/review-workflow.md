@@ -20,7 +20,7 @@ GitHub refuses to let an account approve its own pull request. The rule is evalu
 | `dismiss_stale_reviews` | `true` | A new commit on the branch invalidates earlier approvals |
 | `require_last_push_approval` | `true` | The approval must not come from whoever pushed the branch last |
 | `enforce_admins` | `true` | The owner account cannot merge its own pull request either |
-| `required_status_checks` | `Build and smoke test`, `Static analysis (/analyze)`, strict | CI must be green and the branch must be up to date with `main` |
+| `required_status_checks` | `Build and smoke test`, `Static analysis (/analyze)`, `Text hygiene`, strict | All three checks must pass and the branch must be up to date with `main` |
 | `allow_force_pushes` / `allow_deletions` | `false` | No force pushes, no branch deletion |
 
 `strict = true` means the branch has to contain the current `main`, so CI re-runs against the merge result rather than against the branch head.
@@ -76,7 +76,7 @@ A review usually arrives as **two submissions**: a long `COMMENTED` review carry
 
 1. The author session creates a branch, commits with GPG signing, and pushes.
 2. The author session opens the pull request with `gh pr create`.
-3. CI runs. `Build and smoke test` and `Static analysis (/analyze)` must both pass.
+3. CI runs. When the pull request is opened the run is usually still in progress; `Build and smoke test`, `Static analysis (/analyze)` and `Text hygiene` must all pass before the merge is allowed.
 4. GitHub requests a review from `@BuddyPRReviewer` automatically, because of `.github/CODEOWNERS`.
 5. The review session reviews the diff and submits a comment review with its verification notes and any findings, followed by an approval once nothing blocks the merge. If something does block the merge, the same comment review is submitted as `CHANGES_REQUESTED` instead, and an approval follows only after the fix.
 6. **The author session reads the whole review before merging** - every review body, not just the approval:
