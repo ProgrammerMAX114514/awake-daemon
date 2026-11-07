@@ -8,6 +8,7 @@ Thank you for your interest in contributing! This project is AI-generated (see t
 2. Build the project: `utils\build.bat` (requires Visual Studio 2026 with the MSVC x64 toolset, CMake and PowerShell 7; the batch file only starts `utils\build.ps1`, which finds the toolchain on its own). Custom installations are supported through `utils\toolchain.ini` - copy `utils\toolchain.ini.example` and adjust the paths.
 3. Run the smoke test: `python utils\test\smoketest.py` (requires Python 3.8+, no third-party packages). The configuration lives in `utils\test\smoketest.ini`.
 4. For release hardening (R16), the verification tooling lives in `utils\test\` as well: `acceptance.py` (three-tier acceptance orchestrator), `stress.py` (concurrency storm + pipe fuzzing), `soak.py` (long-run stability, `--minutes 1440` for the full pass) and `manual-checklist.md` (the formal manual review checklist). The CI "Verification" workflow runs a bounded round on demand.
+5. The checks that used to be typed by hand live in `utils\devtool.py` (Python 3.8+, no third-party packages; `python utils\devtool.py --help` lists them): `hygiene` applies the text rules with `--fix` for the whitespace ones, `sign` verifies that every commit on the branch carries a GPG signature, `docs` checks the archive counters and the `main @ <sha>` pointers, `sync` fetches and fast-forwards with retries verified against the remote head, `branches` reports branch state and deletes only merged branches, and `reviews <pr>` dumps every review body of a pull request.
 
 ## Ground rules
 
@@ -33,6 +34,7 @@ Starting with 1.0.0 the public surface is stable:
 - Keep commits focused; one logical change per commit.
 - Use the conventional style already in the log: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `test:`.
 - Every pull request must pass the smoke test locally; include the test summary (e.g. "91 passed, 0 failed") in the description. Run `python utils\test\acceptance.py --tier auto` for changes that touch the daemon core or the wire protocol.
+- Before pushing, run `python utils\devtool.py hygiene` and `python utils\devtool.py sign --base main`. The first is the same check CI runs; the second refuses to let an unsigned commit reach the protected branch, which has already happened once.
 - New behaviour in `common/` should come with a unit test in `tests/` (Catch2 is vendored there; run `ctest --test-dir build` or the `awake_tests.exe` binary). The smoke test covers the CLI end to end, the unit tests cover the parsing and helper logic.
 - CI (`.github/workflows/ci.yml`) builds the project and runs the same smoke test on every push and pull request; a red run blocks the merge. Releases are produced by `release.yml` from a version tag - see the README for the short version.
 - Changes to the wire protocol must be made in `common/include/protocol.h` (single source of truth) and keep older clients working where possible - `ParseStatusResponse` ignores unknown KEY=VALUE lines on purpose.
