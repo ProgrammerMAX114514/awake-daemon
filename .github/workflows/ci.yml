@@ -128,6 +128,30 @@ jobs:
             build/Release/awake.daemon.exe
           if-no-files-found: warn
 
+  # Y8: the text rules (ASCII only, LF in the index, no trailing whitespace,
+  # a final newline) used to be checked by hand before every commit, and the
+  # hand-rolled version had already produced one false positive: an empty grep
+  # pattern matched every line of the file. The same rules live in
+  # utils/devtool.py, so CI runs the tool instead of a shell one-liner.
+  hygiene:
+    name: Text hygiene
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v6
+
+      # The fixtures prove the rules still fire before they are applied to the
+      # tree: a checker that silently passes everything is worse than none.
+      - name: Self-test the checker
+        shell: pwsh
+        run: python utils\devtool.py selftest
+
+      - name: Check the tree
+        shell: pwsh
+        run: python utils\devtool.py hygiene
+
   # R9: an advisory job that builds the tree with the MSVC static analyzer
   # enabled. Findings appear in the job log without failing the build; R16
   # (release hardening) decides when analyzer findings gate a release.
