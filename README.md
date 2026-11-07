@@ -112,11 +112,11 @@ ctest --test-dir build --output-on-failure     # or run build\...\awake_tests.ex
 
 ## Continuous integration
 
-Two GitHub Actions workflows live in `.github/workflows/`:
+Three GitHub Actions workflows live in `.github/workflows/`:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `ci.yml` | push to `main`, every pull request, manual | Builds Release with `utils\build.bat`, verifies that the binary reports the version declared in `CMakeLists.txt`, runs the smoke test, runs the unit tests in a Debug build, builds with the static analyzer and uploads the executables as artifacts. |
+| `ci.yml` | push to `main`, every pull request, manual | Builds Release with `utils\build.bat`, verifies that the binary reports the version declared in `CMakeLists.txt`, runs the unit tests and the smoke test, checks the text rules (`utils\devtool.py`), builds with the static analyzer and uploads the executables as artifacts. The unit tests in a Debug build run only when the workflow is dispatched by hand. |
 | `release.yml` | push of a version tag (`0.*`), manual with a tag input | Builds, **refuses to publish unless the tag equals the built version**, packages `awake-daemon.win64.zip` plus `SHA256SUMS.txt` and creates the GitHub release with the notes from `.github/release-notes/<tag>.md`. |
 | `verification.yml` | manual (soak minutes input), weekly sentinel | The R16 hardening round: stress (concurrency storm + pipe fuzzing) and a bounded soak, reports uploaded as artifacts. |
 

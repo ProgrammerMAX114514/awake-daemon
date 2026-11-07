@@ -20,7 +20,15 @@ What does this pull request change and why?
 - [ ] README.md and README.zh.md updated (if user-visible behavior changed).
 - [ ] Wire protocol changes went through `common/include/protocol.h`.
 
-CI is deliberately not a checkbox. When the pull request is opened the run has not finished yet, so the only honest options would be leaving it unticked or ticking it on hope. The gate is branch protection instead: `Build and smoke test`, `Static analysis (/analyze)` and `Text hygiene` must all pass before the merge button works, and the author confirms that at merge time rather than asserting it here.
+<!--
+CI is deliberately not a checkbox above. When the pull request is opened the
+run has not finished yet, so the only honest options would be leaving it
+unticked or ticking it on hope. The gate is branch protection: Build and
+smoke test, Static analysis (/analyze) and Text hygiene must all pass, and a
+branch that is behind main cannot merge either, because strict is on. The
+author confirms both at merge time rather than asserting them here.
+This note is an HTML comment so that it does not repeat in every description.
+-->
 
 ## Additional notes
 
