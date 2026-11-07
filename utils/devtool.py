@@ -142,7 +142,10 @@ def scan_blob(data, rel):
                 continue
             break
 
-    trailing = [i for i, line in enumerate(text.split("\n"), 1)
+    # splitlines(), not split("\n"): a CRLF file would leave a trailing "\r" on
+    # every line, and "a \r".rstrip(" \t") is still "a \r" - so the rule that
+    # matters most for .bat and .ps1 would silently never fire there.
+    trailing = [i for i, line in enumerate(text.splitlines(), 1)
                 if line != line.rstrip(" \t")]
     if trailing:
         issues.append("%d line(s) with trailing whitespace: %s"
@@ -182,12 +185,16 @@ def fix_text(path, rel):
 def cmd_hygiene(args):
     paths = args.paths or tracked_files()
     failures = 0
+    checked = 0
+    skipped = 0
     fixed = 0
     for rel in paths:
         code, data, err = git("cat-file", "blob", ":" + rel, binary=True)
         if code != 0:
+            skipped += 1
             print("[SKIP] %s (not in the index: %s)" % (rel, err.strip()))
             continue
+        checked += 1
         issues = scan_blob(data, rel)
         if issues:
             failures += 1
@@ -203,7 +210,10 @@ def cmd_hygiene(args):
     if args.fix:
         print("rewritten in the working tree: %d file(s); re-add them to update the index"
               % fixed)
-    print("checked %d file(s), %d with issues" % (len(paths), failures))
+    summary = "checked %d file(s), %d with issues" % (checked, failures)
+    if skipped:
+        summary += ", %d skipped" % skipped
+    print(summary)
     return 1 if failures else 0
 
 
@@ -294,24 +304,34 @@ def doc_files():
 
 def cmd_docs(args):
     problems = []
-    completed = ROOT / ".workbuddy" / "completed.md"
-    expected = None
-    if completed.is_file():
-        text = completed.read_text(encoding="utf-8")
-        expected = sum(1 for line in text.splitlines() if line.startswith("- [x]"))
-        match = COMPLETED_RE.search(text)
-        if not match:
-            problems.append("completed.md: no 'total N items' header found")
-        elif int(match.group(1)) != expected:
-            problems.append("completed.md: header says %s items, the file has %d"
-                            % (match.group(1), expected))
-        print("archive: %d completed item(s)" % expected)
+    against = args.against
+    code, out, err = git("rev-parse", "--verify", "%s^{commit}" % against)
+    if code != 0:
+        print("ref %r not found, comparing against HEAD" % against)
+        against = "HEAD"
+        out = git("rev-parse", "HEAD")[1]
+    target = out.strip()
+    print("against: %s (%s)" % (against, short(target)))
 
-    head = git("rev-parse", "HEAD")[1].strip()
-    print("HEAD: %s" % short(head))
+    completed = ROOT / ".workbuddy" / "completed.md"
+    if not completed.is_file():
+        # A clone without .workbuddy has no archive to compare. Saying
+        # "counters agree" here would claim a check that never ran.
+        print("no archive present, skipped")
+        return 0
+
+    text = completed.read_text(encoding="utf-8")
+    expected = sum(1 for line in text.splitlines() if line.startswith("- [x]"))
+    match = COMPLETED_RE.search(text)
+    if not match:
+        problems.append("completed.md: no 'total N items' header found")
+    elif int(match.group(1)) != expected:
+        problems.append("completed.md: header says %s items, the file has %d"
+                        % (match.group(1), expected))
+    print("archive: %d completed item(s)" % expected)
 
     pending = ROOT / ".workbuddy" / "pending.md"
-    if pending.is_file() and expected is not None:
+    if pending.is_file():
         match = PENDING_RE.search(pending.read_text(encoding="utf-8"))
         if match and int(match.group(1)) != expected:
             problems.append("pending.md: says %s items done, the archive has %d"
@@ -321,15 +341,16 @@ def cmd_docs(args):
         rel = path.relative_to(ROOT).as_posix()
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             # Headings name the state of an older increment on purpose, so only
-            # prose is treated as a pointer to the current main.
+            # prose is treated as a pointer to the current integration branch.
             if line.startswith("#"):
                 continue
             for sha in POINTER_RE.findall(line):
                 if not git_ok("cat-file", "-e", "%s^{commit}" % sha):
                     problems.append("%s:%d: %s does not exist" % (rel, number, sha))
-                elif not head.startswith(sha):
-                    problems.append("%s:%d: points at %s, HEAD is %s"
-                                    % (rel, number, short(sha), short(head)))
+                elif not target.startswith(sha):
+                    problems.append("%s:%d: points at %s, %s is %s"
+                                    % (rel, number, short(sha), against,
+                                       short(target)))
 
     for problem in problems:
         print("[FAIL] %s" % problem)
@@ -422,20 +443,20 @@ def cmd_branches(args):
 
     doomed = [name for name, _, _ in rows
               if name not in (current, args.into) and name in merged]
-    if not args.clean:
-        if doomed:
-            print("merged branches that could be deleted: %s"
-                  % ", ".join(doomed))
-            print("re-run with --clean to delete them (local only)")
-        return 0
-    if not doomed:
-        print("nothing to delete")
-    for name in doomed:
-        code, out, err = git("branch", "-d", name)
-        print("%s %s" % ("deleted" if code == 0 else "kept", name))
-        if code != 0:
-            print("       %s" % (out + err).strip())
+    if args.clean:
+        if not doomed:
+            print("no merged local branch to delete")
+        for name in doomed:
+            code, out, err = git("branch", "-d", name)
+            print("%s %s" % ("deleted" if code == 0 else "kept", name))
+            if code != 0:
+                print("       %s" % (out + err).strip())
+    elif doomed:
+        print("merged branches that could be deleted: %s" % ", ".join(doomed))
+        print("re-run with --clean to delete them")
 
+    # Remote cleanup is independent of the local one: --remote alone is a
+    # request to look at the remote, not a no-op.
     if args.remote:
         slug = repo_slug()
         if not slug or not shutil.which("gh"):
@@ -443,6 +464,7 @@ def cmd_branches(args):
             return 1
         code, out, _ = run(["gh", "api", "repos/%s/branches" % slug,
                             "--jq", ".[].name"])
+        deleted = 0
         for name in [line.strip() for line in out.splitlines() if line.strip()]:
             if name == args.into:
                 continue
@@ -452,6 +474,9 @@ def cmd_branches(args):
                 run(["gh", "api", "--method", "DELETE",
                      "repos/%s/git/refs/heads/%s" % (slug, name)])
                 print("deleted remote %s" % name)
+                deleted += 1
+        if not deleted:
+            print("no merged remote branch to delete")
     return 0
 
 
@@ -666,6 +691,9 @@ SELFTEST_FILES = {
     "nonascii.txt": "caf\u00e9\n".encode("utf-8"),
     "crlf.txt": b"alpha\r\nbeta\r\n",
     "trailing.txt": b"alpha \nbeta\n",
+    # CRLF plus a trailing space: the combination that made the rule invisible
+    # in exactly the file types that keep CRLF.
+    "trailing_crlf.bat": b"alpha \r\nbeta\r\n",
     "noeol.txt": b"alpha\nbeta",
 }
 
@@ -676,6 +704,7 @@ def cmd_selftest(args):
         "nonascii.txt": 1,
         "crlf.txt": 1,
         "trailing.txt": 1,
+        "trailing_crlf.bat": 1,
         "noeol.txt": 1,
     }
     failures = []
@@ -699,6 +728,8 @@ def cmd_selftest(args):
                                 % (name, "; ".join(issues)))
         if (root / "crlf.txt").read_bytes() != b"alpha\nbeta\n":
             failures.append("crlf.txt: --fix did not convert to LF")
+        if (root / "trailing_crlf.bat").read_bytes() != b"alpha\r\nbeta\r\n":
+            failures.append("trailing_crlf.bat: --fix must strip the space and keep CRLF")
 
     for failure in failures:
         print("[FAIL] %s" % failure)
@@ -731,6 +762,8 @@ def main(argv=None):
     sign.set_defaults(func=cmd_sign)
 
     docs = sub.add_parser("docs", help="check archive counters and pointers")
+    docs.add_argument("--against", default="main",
+                      help="ref the pointers must match (default: main)")
     docs.set_defaults(func=cmd_docs)
 
     sync = sub.add_parser("sync", help="fetch and fast-forward from origin")
@@ -744,7 +777,7 @@ def main(argv=None):
     branches.add_argument("--clean", action="store_true",
                           help="delete local branches merged into --into")
     branches.add_argument("--remote", action="store_true",
-                          help="also delete merged remote branches (needs gh)")
+                          help="delete merged remote branches (independent of --clean)")
     branches.set_defaults(func=cmd_branches)
 
     reviews = sub.add_parser("reviews", help="dump the review bodies of a pull request")
